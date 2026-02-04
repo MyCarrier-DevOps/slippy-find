@@ -72,5 +72,5 @@ runs:
     - name: Verify installation
       shell: bash
       run: |
-        slippy-find -h
+        slippy-find --version
         echo "✓ slippy-find installed successfully"
