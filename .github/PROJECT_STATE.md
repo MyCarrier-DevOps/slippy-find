@@ -1,7 +1,7 @@
 # Project State — slippy-find Application
 
-> **Last Updated:** 2025-02-05
-> **Status:** Implementation complete with Vault integration
+> **Last Updated:** 2026-02-04
+> **Status:** Production ready with CI/CD pipeline
 
 ## Overview
 
@@ -40,7 +40,25 @@
 
 ## Recent Changes
 
-### 2025-02-05: Vault Integration for Pipeline Config
+### 2026-02-04: Vault Path#Key Syntax
+- Added support for `path#key` syntax in `VAULT_PIPELINE_CONFIG_PATH` to specify which key in a Vault secret contains the pipeline config
+- Example: `DevOps/slippy/config#config` where path is `DevOps/slippy/config` and key is `config`
+- Default key is `config` if no `#` suffix is provided
+- Added `parseVaultPath()` function and `DefaultSecretKey` constant
+- Updated README documentation with new syntax
+- Added tests for `parseVaultPath()` and custom key loading
+
+### 2026-02-04: CI/CD Pipeline
+- Added GitHub Actions workflow (`.github/workflows/ci.yml`)
+- Automated testing with race detection and 80% coverage threshold
+- Linting with golangci-lint v2.5.0
+- Vulnerability scanning with govulncheck
+- Automatic semantic versioning via conventional commits (mathieudutour/github-tag-action)
+- Cross-platform binary builds (linux/darwin/windows, amd64/arm64)
+- GitHub Releases with checksums
+- Go module proxy update on release
+
+### 2026-02-03: Vault Integration for Pipeline Config
 - Added HashiCorp Vault integration for loading pipeline configuration
 - Uses `goLibMyCarrier/vault` package with AppRole authentication
 - Config loading now tries Vault first, falls back to file if Vault not configured
@@ -93,7 +111,8 @@ Dependency injection refactoring complete. All core functionality implemented an
   - Uses `goLibMyCarrier/vault` package with AppRole authentication
   - Requires `VAULT_ADDRESS`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `VAULT_PIPELINE_CONFIG_PATH`
   - Falls back to `SLIPPY_PIPELINE_CONFIG` file path if Vault env vars not set
-  - Supports pipeline config as JSON string in "config" key or direct field mapping
+  - Supports `path#key` syntax to specify which key contains the config (default: `config`)
+  - Supports pipeline config as JSON string in specified key or direct field mapping as fallback
 - **Trade-offs:** Requires Vault infrastructure; additional env vars for Vault auth
 
 ### AD-005: Full Dependency Injection
@@ -118,10 +137,10 @@ Dependency injection refactoring complete. All core functionality implemented an
 4. ~~Implement `SlipResolver` use case~~ ✅
 5. ~~Implement configuration loading~~ ✅
 6. ~~Build CLI and wire dependencies~~ ✅
-7. ~~Add comprehensive tests (≥85% coverage)~~ ✅
+7. ~~Add comprehensive tests (≥80% coverage)~~ ✅
 8. ~~Run validation (lint, test, security checks)~~ ✅
-9. Integration testing with real ClickHouse (optional)
-10. CI/CD pipeline setup
+9. ~~CI/CD pipeline setup~~ ✅
+10. Integration testing with real ClickHouse (optional)
 
 ## Environment Variables Reference
 
@@ -141,7 +160,7 @@ Dependency injection refactoring complete. All core functionality implemented an
 | `VAULT_ADDRESS` | HashiCorp Vault server address | Yes (if using Vault) |
 | `VAULT_ROLE_ID` | AppRole role ID for authentication | Yes (if using Vault) |
 | `VAULT_SECRET_ID` | AppRole secret ID for authentication | Yes (if using Vault) |
-| `VAULT_PIPELINE_CONFIG_PATH` | Path to pipeline config in Vault KV | Yes (if using Vault) |
+| `VAULT_PIPELINE_CONFIG_PATH` | Path to pipeline config in Vault KV (supports `path#key` syntax) | Yes (if using Vault) |
 | `VAULT_PIPELINE_CONFIG_MOUNT` | Vault KV mount point | No (defaults to "secret") |
 
 ### File-based Configuration (Fallback)

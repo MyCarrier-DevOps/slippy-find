@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	ch "github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse"
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/slippy"
@@ -185,16 +186,34 @@ func loadPipelineConfigWithVault(
 	return loadPipelineConfigFromFile(pipelineConfigPath)
 }
 
+// DefaultSecretKey is the default key name to look for in Vault secrets.
+const DefaultSecretKey = "config"
+
+// parseVaultPath parses a Vault path with optional key suffix.
+// Format: "path/to/secret" or "path/to/secret#keyname"
+// Returns the path and the key name (defaults to "config" if not specified).
+func parseVaultPath(fullPath string) (path, key string) {
+	if idx := strings.LastIndex(fullPath, "#"); idx != -1 {
+		return fullPath[:idx], fullPath[idx+1:]
+	}
+	return fullPath, DefaultSecretKey
+}
+
 // loadPipelineConfigFromVault loads pipeline configuration from Vault KV v2.
+// The path can include a key suffix using '#' (e.g., "path/to/secret#keyname").
+// If no key is specified, defaults to "config".
 func loadPipelineConfigFromVault(
 	ctx context.Context,
 	vaultClientFactory VaultClientFactory,
-	path string,
+	fullPath string,
 ) (*slippy.PipelineConfig, error) {
 	// Use default factory if none provided
 	if vaultClientFactory == nil {
 		vaultClientFactory = DefaultVaultClientFactory
 	}
+
+	// Parse path and key from the full path
+	path, secretKey := parseVaultPath(fullPath)
 
 	// Create Vault client
 	client, err := vaultClientFactory(ctx)
@@ -214,18 +233,16 @@ func loadPipelineConfigFromVault(
 		return nil, fmt.Errorf("%w at path %s: %w", ErrVaultSecretNotFound, path, err)
 	}
 
-	// The pipeline config should be stored as a JSON string in a "config" key
-	// or directly as the secret data
-	return parsePipelineConfigFromVault(secretData)
+	// Parse the pipeline config using the specified key
+	return parsePipelineConfigFromVault(secretData, secretKey)
 }
 
 // parsePipelineConfigFromVault parses pipeline config from Vault secret data.
-// Supports two formats:
-// 1. A "config" key containing JSON string
-// 2. Direct mapping of pipeline config fields in the secret
-func parsePipelineConfigFromVault(secretData map[string]interface{}) (*slippy.PipelineConfig, error) {
-	// Try to get config as JSON string from "config" key
-	if configStr, ok := secretData["config"].(string); ok {
+// Looks for the config in the specified key as a JSON string.
+// If the key doesn't exist, falls back to treating the entire secret as the config.
+func parsePipelineConfigFromVault(secretData map[string]interface{}, secretKey string) (*slippy.PipelineConfig, error) {
+	// Try to get config as JSON string from the specified key
+	if configStr, ok := secretData[secretKey].(string); ok {
 		var config slippy.PipelineConfig
 		if err := json.Unmarshal([]byte(configStr), &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrPipelineConfigInvalid, err)

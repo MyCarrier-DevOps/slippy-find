@@ -75,12 +75,20 @@ Set the following environment variables:
 | `VAULT_ADDRESS` | HashiCorp Vault server address | Yes |
 | `VAULT_ROLE_ID` | AppRole role ID for authentication | Yes |
 | `VAULT_SECRET_ID` | AppRole secret ID for authentication | Yes |
-| `VAULT_PIPELINE_CONFIG_PATH` | Path to pipeline config in Vault KV | Yes |
+| `VAULT_PIPELINE_CONFIG_PATH` | Path to pipeline config in Vault KV (supports `path#key` syntax) | Yes |
 | `VAULT_PIPELINE_CONFIG_MOUNT` | KV mount point | No (default: `secret`) |
 
+**Path Syntax:**
+
+The `VAULT_PIPELINE_CONFIG_PATH` supports an optional key suffix using `#` to specify which key in the secret contains the pipeline config:
+
+- `ci/slippy/pipeline` — Uses the default `config` key
+- `ci/slippy/pipeline#config` — Explicitly uses the `config` key
+- `DevOps/slippy/config#mykey` — Uses the `mykey` key
+
 The pipeline config in Vault can be stored as:
-- A JSON string in a `config` key
-- Direct field mapping in the secret
+- A JSON string in the specified key (or `config` by default)
+- Direct field mapping in the secret (fallback)
 
 #### Option 2: Local File (Fallback)
 
@@ -116,7 +124,7 @@ If Vault environment variables are not set, falls back to file-based configurati
 export VAULT_ADDRESS="https://vault.example.com"
 export VAULT_ROLE_ID="your-role-id"
 export VAULT_SECRET_ID="your-secret-id"
-export VAULT_PIPELINE_CONFIG_PATH="ci/slippy/pipeline-config"
+export VAULT_PIPELINE_CONFIG_PATH="ci/slippy/pipeline-config#config"
 
 export CLICKHOUSE_HOSTNAME="clickhouse.example.com"
 export CLICKHOUSE_PORT="9440"
@@ -192,6 +200,27 @@ golangci-lint run -c .github/.golangci.yml
 ```bash
 go build -o slippy-find .
 ```
+
+## CI/CD
+
+The project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that runs on every push and pull request to `main`.
+
+### Pipeline Stages
+
+| Stage | Description |
+|-------|-------------|
+| **Test** | Runs tests with race detection, requires 80% coverage |
+| **Lint** | Runs golangci-lint with project configuration |
+| **Vuln** | Scans for known vulnerabilities using govulncheck |
+| **Release** | Builds binaries and creates GitHub release (main branch only) |
+
+### Release Artifacts
+
+On successful merge to `main`, the pipeline automatically:
+- Creates a semantic version tag based on commit messages
+- Builds cross-platform binaries (linux/darwin/windows, amd64/arm64)
+- Publishes a GitHub Release with all artifacts and checksums
+- Updates `proxy.golang.org` for immediate availability via `go install`
 
 ## Versioning
 

@@ -402,3 +402,113 @@ func setClickHouseEnvVars(t *testing.T) {
 	t.Setenv("CLICKHOUSE_DATABASE", "ci")
 	t.Setenv("CLICKHOUSE_SKIP_VERIFY", "true")
 }
+
+func TestParseVaultPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		fullPath string
+		wantPath string
+		wantKey  string
+	}{
+		{
+			name:     "path without key uses default",
+			fullPath: "ci/slippy/pipeline",
+			wantPath: "ci/slippy/pipeline",
+			wantKey:  DefaultSecretKey,
+		},
+		{
+			name:     "path with explicit key",
+			fullPath: "DevOps/slippy/config#config",
+			wantPath: "DevOps/slippy/config",
+			wantKey:  "config",
+		},
+		{
+			name:     "path with custom key",
+			fullPath: "my/secret/path#mykey",
+			wantPath: "my/secret/path",
+			wantKey:  "mykey",
+		},
+		{
+			name:     "path with multiple hash symbols uses last one",
+			fullPath: "path/with#hash/in/name#actualkey",
+			wantPath: "path/with#hash/in/name",
+			wantKey:  "actualkey",
+		},
+		{
+			name:     "path ending with hash only returns empty key",
+			fullPath: "ci/slippy/pipeline#",
+			wantPath: "ci/slippy/pipeline",
+			wantKey:  "",
+		},
+		{
+			name:     "simple path",
+			fullPath: "secret",
+			wantPath: "secret",
+			wantKey:  DefaultSecretKey,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPath, gotKey := parseVaultPath(tt.fullPath)
+			assert.Equal(t, tt.wantPath, gotPath, "path mismatch")
+			assert.Equal(t, tt.wantKey, gotKey, "key mismatch")
+		})
+	}
+}
+
+func TestLoadWithVaultClient_CustomKey(t *testing.T) {
+	// Set required env vars with custom key syntax
+	setClickHouseEnvVars(t)
+	os.Unsetenv(EnvPipelineConfig)
+	t.Setenv(EnvVaultPipelineConfigPath, "ci/slippy/pipeline#myconfig")
+
+	// Create mock vault client with JSON string in custom key
+	mockClient := &mockVaultClient{
+		secrets: map[string]map[string]interface{}{
+			"ci/slippy/pipeline": {
+				"myconfig": `{"version":"1","name":"test-pipeline","steps":[{"name":"push_parsed","description":"Push parsed"}]}`,
+			},
+		},
+	}
+
+	// Act
+	cfg, err := LoadWithVaultClient(context.Background(), mockVaultClientFactory(mockClient, nil))
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "test-pipeline", cfg.PipelineConfig.Name)
+}
+
+func TestLoadWithVaultClient_KeyNotFoundFallsBackToSecret(t *testing.T) {
+	// When the specified key doesn't exist as a string, the code falls back
+	// to treating the entire secret as the config. This test verifies that behavior.
+	setClickHouseEnvVars(t)
+	os.Unsetenv(EnvPipelineConfig)
+	t.Setenv(EnvVaultPipelineConfigPath, "ci/slippy/pipeline#nonexistent")
+
+	// The secret has a different key, but the entire secret IS a valid pipeline config
+	mockClient := &mockVaultClient{
+		secrets: map[string]map[string]interface{}{
+			"ci/slippy/pipeline": {
+				"version": "1",
+				"name":    "fallback-pipeline",
+				"steps": []interface{}{
+					map[string]interface{}{
+						"name":        "push_parsed",
+						"description": "Push parsed",
+					},
+				},
+			},
+		},
+	}
+
+	// Act
+	cfg, err := LoadWithVaultClient(context.Background(), mockVaultClientFactory(mockClient, nil))
+
+	// Assert - should succeed by falling back to the entire secret
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "fallback-pipeline", cfg.PipelineConfig.Name)
+}
