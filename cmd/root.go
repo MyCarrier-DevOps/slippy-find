@@ -71,6 +71,10 @@ type AppConfig struct {
 	LogAppName string
 }
 
+// Version is set at build time via ldflags.
+// Example: go build -ldflags="-X github.com/MyCarrier-DevOps/slippy-find/cmd.Version=v1.0.0"
+var Version = "dev"
+
 // Command-line flags.
 var (
 	depth   int
@@ -96,8 +100,9 @@ func NewRootCmd() *cobra.Command {
 // This is the primary constructor that enables testing via dependency injection.
 func NewRootCmdWithDeps(deps *Dependencies) *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "slippy-find [path]",
-		Short: "Resolve routing slips from local Git repository commit history",
+		Use:     "slippy-find [path]",
+		Version: Version,
+		Short:   "Resolve routing slips from local Git repository commit history",
 		Long: `slippy-find resolves routing slips using local Git repository commit history.
 
 It walks the commit ancestry from HEAD and queries the slip store to find
