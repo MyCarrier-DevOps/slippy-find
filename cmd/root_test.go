@@ -170,6 +170,26 @@ func TestRootCmd_ConfigLoadError(t *testing.T) {
 	assert.Contains(t, err.Error(), "configuration error")
 }
 
+func TestRootCmd_NilStderr(t *testing.T) {
+	// Test that nil Stderr falls back to os.Stderr
+	deps := &Dependencies{
+		LoggerFactory: func() Logger { return &mockLogger{} },
+		ConfigLoader: func() (*AppConfig, error) {
+			return nil, errors.New("failed to load config")
+		},
+		Stderr: nil, // Explicitly nil - should fall back to os.Stderr
+	}
+
+	cmd := NewRootCmdWithDeps(deps)
+	cmd.SetArgs([]string{"."})
+
+	err := cmd.Execute()
+
+	// Should still error but should not panic due to nil Stderr
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "configuration error")
+}
+
 func TestRootCmd_GitRepoError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
@@ -481,4 +501,26 @@ func TestRootCmd_WithCustomPath(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "/custom/repo/path", receivedPath)
+}
+
+func TestWriteWarningf(t *testing.T) {
+	t.Run("writes formatted warning to writer", func(t *testing.T) {
+		var buf bytes.Buffer
+		writeWarningf(&buf, "warning: %s %d\n", "test", 42)
+		assert.Equal(t, "warning: test 42\n", buf.String())
+	})
+
+	t.Run("handles write error gracefully", func(t *testing.T) {
+		// Use a writer that always fails
+		failWriter := &failingWriter{}
+		// Should not panic - error is intentionally ignored
+		writeWarningf(failWriter, "this should not panic: %s", "test")
+	})
+}
+
+// failingWriter is a writer that always returns an error.
+type failingWriter struct{}
+
+func (f *failingWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write failed")
 }

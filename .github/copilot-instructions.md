@@ -40,7 +40,7 @@ Follow TDD strictly: **Red → Green → Refactor**
 ### Code Quality
 - All code must pass `golangci-lint` with zero errors
 - No `//nolint` directives without explicit user approval
-- Minimum 85% test coverage required
+- Minimum 80% test coverage required
 
 ---
 

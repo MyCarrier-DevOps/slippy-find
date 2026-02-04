@@ -346,6 +346,52 @@ func TestLoadWithVaultClient_FallsBackToFile(t *testing.T) {
 	assert.Equal(t, "file-fallback-pipeline", cfg.PipelineConfig.Name)
 }
 
+func TestLoadPipelineConfigFromFile_ReadError(t *testing.T) {
+	// Create a directory instead of a file to trigger a read error (not IsNotExist)
+	tmpDir := t.TempDir()
+	dirPath := filepath.Join(tmpDir, "not-a-file")
+	err := os.Mkdir(dirPath, 0o755)
+	require.NoError(t, err)
+
+	// Set required env vars
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, dirPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+
+	// Act
+	_, err = Load()
+
+	// Assert - should fail with read error, not "not found"
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrPipelineConfigNotFound)
+	assert.Contains(t, err.Error(), "failed to read pipeline config")
+}
+
+func TestParsePipelineConfigFromVault_MarshalError(t *testing.T) {
+	// Set required env vars
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvVaultPipelineConfigPath, "ci/slippy/pipeline")
+	os.Unsetenv(EnvPipelineConfig)
+
+	// Create mock vault client with data that will fail unmarshal to PipelineConfig
+	// (valid JSON but wrong structure for PipelineConfig)
+	mockClient := &mockVaultClient{
+		secrets: map[string]map[string]interface{}{
+			"ci/slippy/pipeline": {
+				// No "config" key, and invalid structure for direct mapping
+				"invalid_field": make(chan int), // channels can't be marshaled to JSON
+			},
+		},
+	}
+
+	// Act
+	_, err := LoadWithVaultClient(context.Background(), mockVaultClientFactory(mockClient, nil))
+
+	// Assert
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPipelineConfigInvalid)
+}
+
 // setClickHouseEnvVars sets the required ClickHouse environment variables for testing.
 func setClickHouseEnvVars(t *testing.T) {
 	t.Helper()

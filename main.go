@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"os"
 
 	ch "github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/MyCarrier-DevOps/slippy-find/cmd"
 	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/git"
+	logadapter "github.com/MyCarrier-DevOps/slippy-find/internal/adapters/logger"
 	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/output"
 	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/store"
 	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
@@ -20,31 +20,10 @@ import (
 	"github.com/MyCarrier-DevOps/slippy-find/internal/usecases"
 )
 
-// loggerAdapter adapts logger.Logger to the various logger interfaces.
-type loggerAdapter struct {
-	log logger.Logger
-}
-
-func (a *loggerAdapter) Info(ctx context.Context, msg string, fields map[string]interface{}) {
-	a.log.Info(ctx, msg, fields)
-}
-
-func (a *loggerAdapter) Debug(ctx context.Context, msg string, fields map[string]interface{}) {
-	a.log.Debug(ctx, msg, fields)
-}
-
-func (a *loggerAdapter) Warn(ctx context.Context, msg string, fields map[string]interface{}) {
-	a.log.Warn(ctx, msg, fields)
-}
-
-func (a *loggerAdapter) Error(ctx context.Context, msg string, err error, fields map[string]interface{}) {
-	a.log.Error(ctx, msg, err, fields)
-}
-
 func main() {
 	// Create a single shared logger instance for the application
 	zapLog := logger.NewZapLoggerFromConfig()
-	adapter := &loggerAdapter{log: zapLog}
+	adapter := logadapter.NewZapAdapter(zapLog)
 
 	// Wire up production dependencies
 	deps := &cmd.Dependencies{
@@ -67,20 +46,18 @@ func main() {
 		},
 
 		GitRepoFactory: func(path string, _ cmd.Logger) (domain.LocalGitRepository, error) {
-			// Use the shared adapter for the git repository
 			return git.NewGoGitRepository(path, adapter)
 		},
 
 		SlipFinderFactory: func(cfg *cmd.AppConfig, _ cmd.Logger) (domain.SlipFinder, error) {
-			// The ClickHouseConfig comes from goLibMyCarrier/clickhouse package
 			chConfig, ok := cfg.ClickHouseConfig.(*ch.ClickhouseConfig)
 			if !ok {
-				return nil, &configTypeError{expected: "*ch.ClickhouseConfig"}
+				return nil, newConfigTypeError("*ch.ClickhouseConfig")
 			}
 
 			pipelineCfg, ok := cfg.PipelineConfig.(*slippy.PipelineConfig)
 			if !ok {
-				return nil, &configTypeError{expected: "*slippy.PipelineConfig"}
+				return nil, newConfigTypeError("*slippy.PipelineConfig")
 			}
 
 			slippyStore, err := slippy.NewClickHouseStoreFromConfig(chConfig, slippy.ClickHouseStoreOptions{
@@ -100,7 +77,6 @@ func main() {
 			finder domain.SlipFinder,
 			_ cmd.Logger,
 		) domain.Resolver {
-			// Use the shared adapter for the resolver
 			return usecases.NewSlipResolver(gitRepo, finder, adapter)
 		},
 
@@ -114,6 +90,10 @@ func main() {
 
 	cmd.SetDefaultDependencies(deps)
 	cmd.Execute()
+}
+
+func newConfigTypeError(expected string) error {
+	return &configTypeError{expected: expected}
 }
 
 // configTypeError is returned when configuration type assertion fails.
