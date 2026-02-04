@@ -1,0 +1,83 @@
+name: Lint and Unittests
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!.github/**'
+      - '!.gitignore'
+      - '!makefile'
+      - '!README.md'
+    branches:
+      - main
+  pull_request: 
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!.github/**'
+      - '!.gitignore'
+      - '!makefile'
+      - '!README.md'
+    branches: 
+      - main
+
+jobs:
+  unit_tests:
+    name: unit_tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write # needed for coverage comments
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ^1.25
+      - name: tree
+        run: ls -lR
+          
+
+      - name: unit_tests
+        working-directory: ./ci/slippy-find/
+        run: |
+          go mod download
+          go test -v -cover -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+
+      - name: check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: ./ci/slippy-find/coverage.out
+          threshold-total: 80
+
+  
+  lint:
+    name: lint check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ^1.25
+      - name: Install tools
+        run: make install-tools
+      - name: Lint check
+        working-directory: ./ci/slippy-find/
+        run: |
+          go mod tidy
+          golangci-lint run --config ../../.github/.golangci.yml --timeout 5m ./...
+  
+  vuln:
+    name: check-sec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ^1.25
+      - name: Run vulnerability scan on slippy module
+        run: make check-sec
