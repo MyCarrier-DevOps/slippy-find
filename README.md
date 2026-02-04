@@ -106,8 +106,13 @@ If Vault environment variables are not set, falls back to file-based configurati
 | `CLICKHOUSE_PORT` | ClickHouse server port | Yes |
 | `CLICKHOUSE_USERNAME` | ClickHouse username | Yes |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password | Yes |
-| `CLICKHOUSE_DATABASE` | ClickHouse database name | No (default: `ci`) |
 | `CLICKHOUSE_SKIP_VERIFY` | Skip TLS verification | No |
+
+### Slip Storage Configuration (Optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SLIPPY_DATABASE` | ClickHouse database name for slip storage | `ci` |
 
 ### Logging Configuration (Optional)
 

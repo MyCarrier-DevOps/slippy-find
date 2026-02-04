@@ -21,6 +21,9 @@ const (
 	// EnvPipelineConfig is the path to the pipeline configuration JSON file (deprecated, use Vault).
 	EnvPipelineConfig = "SLIPPY_PIPELINE_CONFIG"
 
+	// EnvDatabase is the ClickHouse database name for slip storage.
+	EnvDatabase = "SLIPPY_DATABASE"
+
 	// EnvLogLevel is the log level (debug, info, error).
 	EnvLogLevel = "LOG_LEVEL"
 
@@ -155,10 +158,16 @@ func LoadWithVaultClient(ctx context.Context, vaultClientFactory VaultClientFact
 		logAppName = DefaultLogAppName
 	}
 
+	// Get database name with default
+	database := os.Getenv(EnvDatabase)
+	if database == "" {
+		database = DefaultDatabase
+	}
+
 	return &Config{
 		ClickHouse:     chConfig,
 		PipelineConfig: pipelineConfig,
-		Database:       DefaultDatabase,
+		Database:       database,
 		LogLevel:       logLevel,
 		LogAppName:     logAppName,
 	}, nil

@@ -151,8 +151,12 @@ Dependency injection refactoring complete. All core functionality implemented an
 | `CLICKHOUSE_PORT` | ClickHouse server port | Yes |
 | `CLICKHOUSE_USERNAME` | ClickHouse username | Yes |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password | Yes |
-| `CLICKHOUSE_DATABASE` | ClickHouse database name | No (defaults to "ci") |
 | `CLICKHOUSE_SKIP_VERIFY` | Skip TLS verification | No |
+
+### Slip Storage Configuration
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SLIPPY_DATABASE` | ClickHouse database name for slip storage | No (defaults to "ci") |
 
 ### Vault Configuration (Preferred for Pipeline Config)
 | Variable | Description | Required |

@@ -177,6 +177,50 @@ func TestLoad_CustomLogSettings(t *testing.T) {
 	assert.Equal(t, "custom-app", cfg.LogAppName)
 }
 
+func TestLoad_DefaultDatabase(t *testing.T) {
+	// Create a temp file with valid pipeline config JSON
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "pipeline.json")
+	validConfig := `{"version":"1","name":"test","steps":[{"name":"step1","description":"desc"}]}`
+	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
+	require.NoError(t, err)
+
+	// Set required env vars, but not database
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, configPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+	os.Unsetenv(EnvDatabase)
+
+	// Act
+	cfg, err := Load()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, DefaultDatabase, cfg.Database)
+}
+
+func TestLoad_CustomDatabase(t *testing.T) {
+	// Create a temp file with valid pipeline config JSON
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "pipeline.json")
+	validConfig := `{"version":"1","name":"test","steps":[{"name":"step1","description":"desc"}]}`
+	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
+	require.NoError(t, err)
+
+	// Set all env vars including custom database
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, configPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+	t.Setenv(EnvDatabase, "production")
+
+	// Act
+	cfg, err := Load()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "production", cfg.Database)
+}
+
 // Vault integration tests
 
 func TestLoadWithVaultClient_VaultConfigAsJSONString(t *testing.T) {
