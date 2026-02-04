@@ -1,0 +1,76 @@
+name: 'Setup slippy-find'
+description: 'Install the slippy-find CLI from GitHub Releases'
+branding:
+  icon: 'download'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'Version to install (e.g., v0.2.0). Use "latest" for the most recent release.'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        
+        # Map architecture names
+        case "$ARCH" in
+          x86_64)  ARCH="amd64" ;;
+          aarch64) ARCH="arm64" ;;
+          arm64)   ARCH="arm64" ;;
+        esac
+        
+        # Build binary name
+        if [ "$OS" = "windows" ]; then
+          BINARY="slippy-find-${OS}-${ARCH}.exe"
+        else
+          BINARY="slippy-find-${OS}-${ARCH}"
+        fi
+        
+        echo "os=$OS" >> "$GITHUB_OUTPUT"
+        echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
+        echo "binary=$BINARY" >> "$GITHUB_OUTPUT"
+
+    - name: Download slippy-find
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        BINARY="${{ steps.platform.outputs.binary }}"
+        
+        if [ "$VERSION" = "latest" ]; then
+          URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/latest/download/${BINARY}"
+        else
+          URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}/${BINARY}"
+        fi
+        
+        echo "Downloading slippy-find from: $URL"
+        curl -sL --fail "$URL" -o slippy-find || {
+          echo "::error::Failed to download slippy-find from $URL"
+          exit 1
+        }
+        
+        chmod +x slippy-find
+
+    - name: Install slippy-find
+      shell: bash
+      run: |
+        if [ "${{ steps.platform.outputs.os }}" = "windows" ]; then
+          mkdir -p "$HOME/bin"
+          mv slippy-find "$HOME/bin/slippy-find.exe"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+        else
+          sudo mv slippy-find /usr/local/bin/
+        fi
+
+    - name: Verify installation
+      shell: bash
+      run: |
+        slippy-find --version
+        echo "✓ slippy-find installed successfully"

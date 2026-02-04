@@ -22,6 +22,45 @@ A Go CLI application that resolves routing slips from local Git repository commi
 go install github.com/MyCarrier-DevOps/slippy-find@latest
 ```
 
+### GitHub Actions
+
+Use the provided action to install pre-built binaries (fastest):
+
+```yaml
+- name: Install slippy-find
+  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
+
+- name: Run slippy-find
+  env:
+    VAULT_ADDRESS: ${{ secrets.VAULT_ADDRESS }}
+    # ... other env vars
+  run: slippy-find
+```
+
+To pin to a specific version:
+
+```yaml
+- uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
+  with:
+    version: v0.2.0
+```
+
+### Download Binary
+
+Download pre-built binaries from [GitHub Releases](https://github.com/MyCarrier-DevOps/slippy-find/releases):
+
+```bash
+# Linux (amd64)
+curl -sL https://github.com/MyCarrier-DevOps/slippy-find/releases/latest/download/slippy-find-linux-amd64 -o slippy-find
+chmod +x slippy-find
+sudo mv slippy-find /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -sL https://github.com/MyCarrier-DevOps/slippy-find/releases/latest/download/slippy-find-darwin-arm64 -o slippy-find
+chmod +x slippy-find
+sudo mv slippy-find /usr/local/bin/
+```
+
 ### Building from Source
 
 ```bash
