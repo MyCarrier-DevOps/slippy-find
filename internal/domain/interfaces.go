@@ -51,25 +51,6 @@ type OutputWriter interface {
 	WriteCorrelationID(correlationID string) error
 }
 
-// ConfigLoader loads application configuration.
-type ConfigLoader interface {
-	// Load loads and returns the application configuration.
-	Load() (*Config, error)
-}
-
-// Config holds the application configuration needed by the resolver.
-// This is a domain representation - adapters map their specific configs to this.
-type Config struct {
-	// Database is the database name for slip storage.
-	Database string
-
-	// LogLevel is the logging level.
-	LogLevel string
-
-	// LogAppName is the application name for logging.
-	LogAppName string
-}
-
 // SlipFinder queries the slip store to find slips by commit ancestry.
 type SlipFinder interface {
 	// FindByCommits searches for a slip matching any of the given commits.

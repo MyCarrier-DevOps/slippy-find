@@ -62,7 +62,7 @@
 
 ### 2026-02-04: Project Initialization
 - Created `.github/PROJECT_STATE.md`
-- Created `go.mod` with module path `github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find`
+- Created `go.mod` with module path `github.com/MyCarrier-DevOps/slippy-find`
 - Scaffolded directory structure per CLEAN architecture
 
 ## Current Focus

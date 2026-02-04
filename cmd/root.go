@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
 
 // Logger defines the logging interface used by the command.
@@ -56,10 +56,10 @@ type Dependencies struct {
 // AppConfig holds application configuration loaded by ConfigLoader.
 type AppConfig struct {
 	// ClickHouseConfig is passed to the SlipFinderFactory.
-	ClickHouseConfig interface{}
+	ClickHouseConfig any
 
 	// PipelineConfig is passed to the SlipFinderFactory.
-	PipelineConfig interface{}
+	PipelineConfig any
 
 	// Database is the database name.
 	Database string
@@ -257,8 +257,12 @@ func Execute() {
 }
 
 // writeWarningf writes a warning message to the given writer.
-// This is a best-effort operation; errors are intentionally ignored.
-func writeWarningf(w io.Writer, format string, args ...interface{}) {
-	//nolint:errcheck // Best-effort warning output
-	fmt.Fprintf(w, format, args...)
+// This is a best-effort operation; errors are intentionally ignored
+// because there is no recovery action if stderr writes fail.
+func writeWarningf(w io.Writer, format string, args ...any) {
+	_, err := fmt.Fprintf(w, format, args...)
+	if err != nil {
+		// Intentionally ignored: no recovery action for failed stderr writes
+		return
+	}
 }

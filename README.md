@@ -16,11 +16,18 @@ A Go CLI application that resolves routing slips from local Git repository commi
 
 ## Installation
 
-Build from source:
+### Using `go install`
 
 ```bash
-cd ci/slippy-find
-go build -o slippy .
+go install github.com/MyCarrier-DevOps/slippy-find@latest
+```
+
+### Building from Source
+
+```bash
+git clone https://github.com/MyCarrier-DevOps/slippy-find.git
+cd slippy-find
+go build -o slippy-find .
 ```
 
 ## Usage
@@ -183,9 +190,56 @@ golangci-lint run -c .github/.golangci.yml
 ### Building
 
 ```bash
-go build -o slippy .
+go build -o slippy-find .
 ```
+
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/) with automatic version bumps based on [Conventional Commits](https://www.conventionalcommits.org/).
+
+### How to Increment the Version
+
+When merging to `main`, the CI pipeline automatically creates a new version tag based on your commit messages:
+
+| Commit Prefix | Version Bump | Example |
+|---------------|--------------|---------|
+| `fix:` | Patch | v1.0.0 → v1.0.1 |
+| `feat:` | Minor | v1.0.0 → v1.1.0 |
+| `feat!:` or `BREAKING CHANGE:` | Major | v1.0.0 → v2.0.0 |
+| Other | Patch (default) | v1.0.0 → v1.0.1 |
+
+### Commit Message Examples
+
+```bash
+# Patch release (bug fix)
+git commit -m "fix: handle nil pointer in resolver"
+
+# Minor release (new feature)
+git commit -m "feat: add support for custom depth flag"
+
+# Major release (breaking change)
+git commit -m "feat!: change output format to JSON"
+# or
+git commit -m "feat: change output format
+
+BREAKING CHANGE: Output is now JSON instead of plain text"
+```
+
+### Release Process
+
+1. Make changes and commit using conventional commit format
+2. Push to `main` (directly or via PR merge)
+3. CI pipeline automatically:
+   - Runs tests, lint, and vulnerability scan
+   - Bumps version based on commit messages
+   - Builds cross-platform binaries
+   - Creates GitHub Release with artifacts
+   - Updates `proxy.golang.org` for `go install` users
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Internal MyCarrier tool.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

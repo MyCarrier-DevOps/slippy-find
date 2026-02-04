@@ -13,7 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
 
 // Logger defines the logging interface for the git adapter.

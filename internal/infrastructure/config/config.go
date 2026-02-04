@@ -35,11 +35,10 @@ const (
 
 // Default values.
 const (
-	DefaultLogLevel            = "info"
-	DefaultLogAppName          = "slippy-find"
-	DefaultDatabase            = "ci"
-	DefaultVaultPipelineMount  = "secret"
-	DefaultVaultRequestTimeout = 30
+	DefaultLogLevel           = "info"
+	DefaultLogAppName         = "slippy-find"
+	DefaultDatabase           = "ci"
+	DefaultVaultPipelineMount = "secret"
 )
 
 // Configuration errors.

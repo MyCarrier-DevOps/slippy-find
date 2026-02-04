@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
 
 // Logger defines the logging interface required by the resolver.

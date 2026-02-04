@@ -6,7 +6,7 @@ import (
 
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/slippy"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
 
 // ClickHouseAdapter wraps goLibMyCarrier's SlipStore to implement domain.SlipFinder.

@@ -11,13 +11,13 @@ import (
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/logger"
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/slippy"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/cmd"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/adapters/git"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/adapters/output"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/adapters/store"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/infrastructure/config"
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/usecases"
+	"github.com/MyCarrier-DevOps/slippy-find/cmd"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/git"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/output"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/store"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/infrastructure/config"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/usecases"
 )
 
 // loggerAdapter adapts logger.Logger to the various logger interfaces.
@@ -75,12 +75,12 @@ func main() {
 			// The ClickHouseConfig comes from goLibMyCarrier/clickhouse package
 			chConfig, ok := cfg.ClickHouseConfig.(*ch.ClickhouseConfig)
 			if !ok {
-				return nil, &configTypeError{expected: "*ch.ClickhouseConfig", got: cfg.ClickHouseConfig}
+				return nil, &configTypeError{expected: "*ch.ClickhouseConfig"}
 			}
 
 			pipelineCfg, ok := cfg.PipelineConfig.(*slippy.PipelineConfig)
 			if !ok {
-				return nil, &configTypeError{expected: "*slippy.PipelineConfig", got: cfg.PipelineConfig}
+				return nil, &configTypeError{expected: "*slippy.PipelineConfig"}
 			}
 
 			slippyStore, err := slippy.NewClickHouseStoreFromConfig(chConfig, slippy.ClickHouseStoreOptions{
@@ -119,7 +119,6 @@ func main() {
 // configTypeError is returned when configuration type assertion fails.
 type configTypeError struct {
 	expected string
-	got      interface{}
 }
 
 func (e *configTypeError) Error() string {

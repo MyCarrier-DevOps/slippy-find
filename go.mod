@@ -1,4 +1,4 @@
-module github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find
+module github.com/MyCarrier-DevOps/slippy-find
 
 go 1.25.6
 

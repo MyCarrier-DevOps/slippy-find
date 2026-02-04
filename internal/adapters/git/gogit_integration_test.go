@@ -14,7 +14,7 @@ import (
 
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/logger"
 
-	"github.com/MyCarrier-DevOps/slippy-find/ci/slippy-find/internal/domain"
+	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
 
 // testLogger is a minimal logger for testing that doesn't output anything.

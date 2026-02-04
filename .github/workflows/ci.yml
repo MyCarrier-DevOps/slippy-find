@@ -1,83 +1,169 @@
-name: Lint and Unittests
+name: CI
+
 on:
   workflow_dispatch:
   push:
     paths:
-      - '**'
-      - '!docs/**'
-      - '!.github/**'
-      - '!.gitignore'
-      - '!makefile'
-      - '!README.md'
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ci.yml'
+      - '.github/.golangci.yml'
     branches:
       - main
-  pull_request: 
+  pull_request:
     paths:
-      - '**'
-      - '!docs/**'
-      - '!.github/**'
-      - '!.gitignore'
-      - '!makefile'
-      - '!README.md'
-    branches: 
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ci.yml'
+      - '.github/.golangci.yml'
+    branches:
       - main
 
+env:
+  GO_VERSION: '1.25'
+
 jobs:
-  unit_tests:
-    name: unit_tests
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
       actions: read
-      pull-requests: write # needed for coverage comments
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: ^1.25
-      - name: tree
-        run: ls -lR
-          
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: unit_tests
-        working-directory: ./ci/slippy-find/
-        run: |
-          go mod download
-          go test -v -cover -coverprofile=coverage.out -covermode=atomic ./...
-          go tool cover -func=coverage.out
+      - name: Download dependencies
+        run: go mod download
 
-      - name: check test coverage
+      - name: Run tests
+        run: go test -v -race -cover -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Display coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Check test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
-          profile: ./ci/slippy-find/coverage.out
+          profile: coverage.out
           threshold-total: 80
 
-  
   lint:
-    name: lint check
+    name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: ^1.25
-      - name: Install tools
-        run: make install-tools
-      - name: Lint check
-        working-directory: ./ci/slippy-find/
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0
+
+      - name: Run linter
         run: |
           go mod tidy
-          golangci-lint run --config ../../.github/.golangci.yml --timeout 5m ./...
-  
+          golangci-lint run --config .github/.golangci.yml --timeout 5m ./...
+
   vuln:
-    name: check-sec
+    name: Vulnerability Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: ^1.25
-      - name: Run vulnerability scan on slippy module
-        run: make check-sec
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run vulnerability scan
+        run: govulncheck -show verbose ./...
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [test, lint, vuln]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      changelog: ${{ steps.tag_version.outputs.changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: main
+          tag_prefix: v
+
+      - name: Create changelog
+        id: changelog
+        if: steps.tag_version.outputs.new_tag
+        run: |
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "${{ steps.tag_version.outputs.changelog }}" >> CHANGELOG.md
+
+      - uses: actions/setup-go@v5
+        if: steps.tag_version.outputs.new_tag
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build binaries
+        if: steps.tag_version.outputs.new_tag
+        run: |
+          VERSION=${{ steps.tag_version.outputs.new_tag }}
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+          
+          # Build for multiple platforms
+          GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-linux-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-darwin-arm64 .
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-windows-amd64.exe .
+          
+          # Create checksums
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        if: steps.tag_version.outputs.new_tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body_path: CHANGELOG.md
+          files: |
+            dist/slippy-find-linux-amd64
+            dist/slippy-find-linux-arm64
+            dist/slippy-find-darwin-amd64
+            dist/slippy-find-darwin-arm64
+            dist/slippy-find-windows-amd64.exe
+            dist/checksums.txt
+          generate_release_notes: true
+
+      - name: Update Go module proxy
+        if: steps.tag_version.outputs.new_tag
+        run: |
+          # Request the new version from proxy.golang.org to trigger caching
+          curl -s "https://proxy.golang.org/github.com/!my!carrier-!dev!ops/slippy-find/@v/${{ steps.tag_version.outputs.new_tag }}.info" || true
+          # Also request the version list to update it
+          curl -s "https://proxy.golang.org/github.com/!my!carrier-!dev!ops/slippy-find/@v/list" || true
+          echo "Module proxy updated for ${{ steps.tag_version.outputs.new_tag }}"
