@@ -4,14 +4,11 @@ package git
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
@@ -101,8 +98,13 @@ func (r *GoGitRepository) GetGitContext(ctx context.Context) (*domain.GitContext
 	return gitCtx, nil
 }
 
-// GetCommitAncestry walks the commit graph from HEAD, returning commit SHAs.
+// GetCommitAncestry walks the first-parent chain from HEAD, returning commit SHAs.
 // Returns commits in order from newest (HEAD) to oldest, up to depth commits.
+//
+// Only the first parent of each commit is followed. This prevents merge commits
+// from polluting ancestry with commits from other branches (e.g., merging main
+// into a feature branch would otherwise include main's commits, causing
+// incorrect slip resolution).
 func (r *GoGitRepository) GetCommitAncestry(ctx context.Context, depth int) ([]string, error) {
 	if depth <= 0 {
 		depth = domain.DefaultAncestryDepth
@@ -115,40 +117,41 @@ func (r *GoGitRepository) GetCommitAncestry(ctx context.Context, depth int) ([]s
 	}
 
 	// Get the commit object for HEAD
-	commit, err := r.repo.CommitObject(head.Hash())
+	current, err := r.repo.CommitObject(head.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit object for HEAD: %w", err)
 	}
 
-	// Walk commit history from HEAD using commit-time ordering
+	// Walk first-parent chain only (equivalent to git log --first-parent).
+	// For merge commits, parent 0 is the branch you were on when you ran
+	// git merge, and parent 1+ are the branches merged in.
 	var commits []string
-	iter := object.NewCommitIterCTime(commit, nil, nil)
-
-	err = iter.ForEach(func(c *object.Commit) error {
+	for len(commits) < depth {
 		// Check context for cancellation
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		if len(commits) >= depth {
-			return storer.ErrStop
-		}
-		commits = append(commits, c.Hash.String())
-		return nil
-	})
+		commits = append(commits, current.Hash.String())
 
-	// ErrStop is expected when we reach depth limit
-	if err != nil && !errors.Is(err, storer.ErrStop) {
-		return nil, fmt.Errorf("failed to walk commit history: %w", err)
+		// Follow first parent only — stop at root commits
+		if current.NumParents() == 0 {
+			break
+		}
+		parent, err := current.Parent(0)
+		if err != nil {
+			break
+		}
+		current = parent
 	}
 
 	if len(commits) == 0 {
 		return nil, domain.ErrEmptyAncestry
 	}
 
-	r.logger.Debug(ctx, "walked commit ancestry", map[string]interface{}{
+	r.logger.Debug(ctx, "walked commit ancestry (first-parent)", map[string]interface{}{
 		"depth_requested": depth,
 		"commits_found":   len(commits),
 		"head_sha":        commits[0],

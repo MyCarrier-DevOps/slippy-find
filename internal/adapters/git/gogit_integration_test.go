@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -282,4 +283,81 @@ func TestGoGitRepository_Close(t *testing.T) {
 
 	err = repo.Close()
 	require.NoError(t, err)
+}
+
+// TestGoGitRepository_GetCommitAncestry_FirstParentOnly tests that merge commits
+// from other branches are excluded from the ancestry chain. This prevents incorrect
+// slip resolution when the default branch is merged into a feature branch.
+func TestGoGitRepository_GetCommitAncestry_FirstParentOnly(t *testing.T) {
+	repoPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	// Capture the default branch name before switching branches
+	defaultBranch := getGitOutput(t, repoPath, "branch", "--show-current")
+
+	// Create a feature-branch commit
+	testFile := filepath.Join(repoPath, "feature.txt")
+	require.NoError(t, os.WriteFile(testFile, []byte("feature work"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Feature commit 1")
+
+	// Record the feature commit SHA
+	featureCommit1 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Create a side branch simulating main with its own commits
+	runGit(t, repoPath, "checkout", "-b", "simulated-main", "HEAD~1")
+	mainFile := filepath.Join(repoPath, "main-change.txt")
+	require.NoError(t, os.WriteFile(mainFile, []byte("main work 1"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Main commit 1")
+	mainCommit1 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	require.NoError(t, os.WriteFile(mainFile, []byte("main work 2"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Main commit 2")
+	mainCommit2 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Switch back to the feature branch
+	runGit(t, repoPath, "checkout", defaultBranch)
+
+	// Merge simulated-main into the feature branch (creates a merge commit)
+	runGit(t, repoPath, "merge", "simulated-main", "-m", "Merge main into feature")
+	mergeCommit := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Create one more feature commit after the merge
+	require.NoError(t, os.WriteFile(testFile, []byte("feature work 2"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Feature commit 2")
+	featureCommit2 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Now get ancestry — should follow first-parent only
+	log := &testLogger{}
+	repo, err := NewGoGitRepository(repoPath, log)
+	require.NoError(t, err)
+	defer repo.Close()
+
+	ctx := context.Background()
+	commits, err := repo.GetCommitAncestry(ctx, 20)
+	require.NoError(t, err)
+
+	// First-parent chain: featureCommit2 -> mergeCommit -> featureCommit1 -> initial
+	// The main branch commits should NOT appear
+	assert.Contains(t, commits, featureCommit2, "latest feature commit should be in ancestry")
+	assert.Contains(t, commits, mergeCommit, "merge commit should be in ancestry")
+	assert.Contains(t, commits, featureCommit1, "feature commit 1 should be in ancestry")
+	assert.NotContains(t, commits, mainCommit1, "main branch commit 1 should be excluded")
+	assert.NotContains(t, commits, mainCommit2, "main branch commit 2 should be excluded")
+
+	// Verify ordering: featureCommit2 comes first (HEAD)
+	assert.Equal(t, featureCommit2, commits[0], "HEAD should be the first commit")
+}
+
+// getGitOutput runs a git command and returns its trimmed stdout.
+func getGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	require.NoError(t, err, "git %v failed", args)
+	return strings.TrimSpace(string(output))
 }
