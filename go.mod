@@ -3,10 +3,10 @@ module github.com/MyCarrier-DevOps/slippy-find
 go 1.25.6
 
 require (
-	github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse v1.3.60
-	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.60
-	github.com/MyCarrier-DevOps/goLibMyCarrier/slippy v1.3.60
-	github.com/MyCarrier-DevOps/goLibMyCarrier/vault v1.3.60
+	github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse v1.3.61
+	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.61
+	github.com/MyCarrier-DevOps/goLibMyCarrier/slippy v1.3.61
+	github.com/MyCarrier-DevOps/goLibMyCarrier/vault v1.3.61
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.11.1
