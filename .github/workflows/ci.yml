@@ -22,7 +22,7 @@ on:
       - main
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
 
 jobs:
   test:
@@ -66,7 +66,7 @@ jobs:
 
       - name: Install golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.10.1
 
       - name: Run linter
         run: |
@@ -131,14 +131,14 @@ jobs:
         run: |
           VERSION=${{ steps.tag_version.outputs.new_tag }}
           LDFLAGS="-s -w -X github.com/MyCarrier-DevOps/slippy-find/cmd.Version=${VERSION}"
-          
+
           # Build for multiple platforms
           GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-linux-amd64 .
           GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-linux-arm64 .
           GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-darwin-amd64 .
           GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-darwin-arm64 .
           GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/slippy-find-windows-amd64.exe .
-          
+
           # Create checksums
           cd dist
           sha256sum * > checksums.txt
