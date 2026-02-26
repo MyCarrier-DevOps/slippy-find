@@ -3,6 +3,7 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/slippy"
 
@@ -32,6 +33,9 @@ func (a *ClickHouseAdapter) FindByCommits(
 ) (*domain.Slip, string, error) {
 	slip, matchedCommit, err := a.store.FindByCommits(ctx, repository, commits)
 	if err != nil {
+		if errors.Is(err, slippy.ErrSlipNotFound) {
+			return nil, "", nil
+		}
 		return nil, "", err
 	}
 

@@ -1,6 +1,6 @@
 # Project State — slippy-find Application
 
-> **Last Updated:** 2026-02-25
+> **Last Updated:** 2026-02-26
 > **Status:** Production ready; maintenance validation passed on Go 1.26
 
 ## Overview
@@ -39,6 +39,11 @@
 | usecases | 100% |
 
 ## Recent Changes
+
+### 2026-02-26: Not-Found Error Normalization for slippy FindByCommits
+- Updated `internal/adapters/store/clickhouse.go` to map `slippy.ErrSlipNotFound` to `(nil, "", nil)` in `ClickHouseAdapter.FindByCommits`
+- Added regression test `TestClickHouseAdapter_FindByCommits_NotFoundErrorMappedToNil` in `internal/adapters/store/clickhouse_test.go`
+- Result: `slippy-find` now handles upstream not-found semantics consistently and surfaces domain-level `no slip found in commit ancestry`
 
 ### 2026-02-25: CI Tooling Version Alignment
 - Updated GitHub Actions workflow in `.github/workflows/ci.yml` to use `GO_VERSION: '1.26'` (from `1.25`)

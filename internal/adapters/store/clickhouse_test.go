@@ -126,6 +126,23 @@ func TestClickHouseAdapter_FindByCommits_NotFound(t *testing.T) {
 	assert.Equal(t, "", matchedCommit)
 }
 
+func TestClickHouseAdapter_FindByCommits_NotFoundErrorMappedToNil(t *testing.T) {
+	mockStore := &mockSlipStore{
+		findByCommitsErr: slippy.ErrSlipNotFound,
+	}
+	adapter := NewClickHouseAdapter(mockStore)
+
+	slip, matchedCommit, err := adapter.FindByCommits(
+		context.Background(),
+		"test/repo",
+		[]string{"abc123"},
+	)
+
+	require.NoError(t, err)
+	assert.Nil(t, slip)
+	assert.Equal(t, "", matchedCommit)
+}
+
 func TestClickHouseAdapter_FindByCommits_Error(t *testing.T) {
 	mockStore := &mockSlipStore{
 		findByCommitsErr: errors.New("database connection failed"),
