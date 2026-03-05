@@ -1,7 +1,7 @@
 # Project State — slippy-find Application
 
-> **Last Updated:** 2026-02-04
-> **Status:** Production ready with CI/CD pipeline
+> **Last Updated:** 2026-02-26
+> **Status:** Production ready; maintenance validation passed on Go 1.26
 
 ## Overview
 
@@ -39,6 +39,21 @@
 | usecases | 100% |
 
 ## Recent Changes
+
+### 2026-02-26: Not-Found Error Normalization for slippy FindByCommits
+- Updated `internal/adapters/store/clickhouse.go` to map `slippy.ErrSlipNotFound` to `(nil, "", nil)` in `ClickHouseAdapter.FindByCommits`
+- Added regression test `TestClickHouseAdapter_FindByCommits_NotFoundErrorMappedToNil` in `internal/adapters/store/clickhouse_test.go`
+- Result: `slippy-find` now handles upstream not-found semantics consistently and surfaces domain-level `no slip found in commit ancestry`
+
+### 2026-02-25: CI Tooling Version Alignment
+- Updated GitHub Actions workflow in `.github/workflows/ci.yml` to use `GO_VERSION: '1.26'` (from `1.25`)
+- Updated CI lint job to install `golangci-lint v2.10.1` (from `v2.5.0`)
+- Rewrote `MAINTENANCE.md` with repository-specific, CI-aligned maintenance guidance including local equivalents for lint, test/coverage, and vulnerability scan
+
+### 2026-02-25: Maintenance Validation Pass
+- Ran full maintenance validation sequence on macOS: `go fmt ./...`, `go mod tidy`, `golangci-lint run -c .github/.golangci.yml`, `go test -v -race -coverprofile=coverage.out ./...`, and `go build -o slippy .`
+- Verified environment versions: Go `1.26.0` and `golangci-lint v2.10.1`
+- Result: all checks passed with zero lint issues; tests passed with race detection and coverage profile generated at `coverage.out`
 
 ### 2026-02-04: Vault Path#Key Syntax
 - Added support for `path#key` syntax in `VAULT_PIPELINE_CONFIG_PATH` to specify which key in a Vault secret contains the pipeline config
@@ -118,7 +133,7 @@ Dependency injection refactoring complete. All core functionality implemented an
 ### AD-005: Full Dependency Injection
 - **Decision:** All external dependencies injected via interfaces; no direct instantiation in business logic
 - **Rationale:** Enables comprehensive unit testing via mocks; follows SOLID principles
-- **Implementation:** 
+- **Implementation:**
   - `cmd/root.go` accepts `Dependencies` struct with factory functions
   - All adapters accept interfaces, not concrete types
   - Domain interfaces defined for: `LocalGitRepository`, `SlipFinder`, `OutputWriter`, `Resolver`, `Logger`
