@@ -78,6 +78,12 @@ func (m *mockSlipStore) FindAllByCommits(
 ) ([]slippy.SlipWithCommit, error) {
 	return nil, nil
 }
+func (m *mockSlipStore) InsertAncestryLink(_ context.Context, _ *slippy.Slip, _ slippy.AncestryEntry) error {
+	return nil
+}
+func (m *mockSlipStore) ResolveAncestry(_ context.Context, _, _, _ string, _ int) ([]slippy.AncestryEntry, error) {
+	return nil, nil
+}
 
 func TestNewClickHouseAdapter(t *testing.T) {
 	mockStore := &mockSlipStore{}
