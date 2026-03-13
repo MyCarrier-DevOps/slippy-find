@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse v1.3.64
 	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.64
-	github.com/MyCarrier-DevOps/goLibMyCarrier/slippy v1.3.64
+	github.com/MyCarrier-DevOps/goLibMyCarrier/slippy v1.3.65
 	github.com/MyCarrier-DevOps/goLibMyCarrier/vault v1.3.64
 	github.com/go-git/go-git/v5 v5.16.5
 	github.com/spf13/cobra v1.8.1
