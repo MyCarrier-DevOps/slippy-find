@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/MyCarrier-DevOps/slippy-find/internal/domain"
 )
@@ -105,6 +106,11 @@ func (r *GoGitRepository) GetGitContext(ctx context.Context) (*domain.GitContext
 // from polluting ancestry with commits from other branches (e.g., merging main
 // into a feature branch would otherwise include main's commits, causing
 // incorrect slip resolution).
+//
+// Special case: when HEAD is a detached merge commit (typical of GitHub Actions
+// pull_request checkout), all parent chains are walked independently. This
+// ensures both the base branch and feature branch commits are searched, since
+// the routing slip is typically associated with a feature branch commit.
 func (r *GoGitRepository) GetCommitAncestry(ctx context.Context, depth int) ([]string, error) {
 	if depth <= 0 {
 		depth = domain.DefaultAncestryDepth
@@ -117,41 +123,51 @@ func (r *GoGitRepository) GetCommitAncestry(ctx context.Context, depth int) ([]s
 	}
 
 	// Get the commit object for HEAD
-	current, err := r.repo.CommitObject(head.Hash())
+	headCommit, err := r.repo.CommitObject(head.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit object for HEAD: %w", err)
 	}
 
-	// Walk first-parent chain only (equivalent to git log --first-parent).
-	// For merge commits, parent 0 is the branch you were on when you ran
-	// git merge, and parent 1+ are the branches merged in.
+	seen := make(map[string]bool)
 	var commits []string
-	for len(commits) < depth {
-		// Check context for cancellation
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
 
-		commits = append(commits, current.Hash.String())
+	// When HEAD is a detached merge commit (e.g., CI merge commit created by
+	// actions/checkout for pull requests), walk all parent chains. The first
+	// parent is the base branch and subsequent parents are the merged-in
+	// branches. Without this, we'd only search the base branch and miss the
+	// feature branch commits where the routing slip was created.
+	if headCommit.NumParents() > 1 && !head.Name().IsBranch() {
+		r.logger.Debug(ctx, "HEAD is a detached merge commit; walking all parent chains", map[string]interface{}{
+			"num_parents": headCommit.NumParents(),
+			"head_sha":    headCommit.Hash.String(),
+		})
 
-		// Follow first parent only — stop at root commits
-		if current.NumParents() == 0 {
-			break
+		// Include the merge commit itself
+		commits = append(commits, headCommit.Hash.String())
+		seen[headCommit.Hash.String()] = true
+
+		// Walk each parent chain with full depth budget
+		for i := range headCommit.NumParents() {
+			parent, pErr := headCommit.Parent(i)
+			if pErr != nil {
+				continue
+			}
+			if err := r.walkFirstParent(ctx, parent, depth, seen, &commits); err != nil {
+				return nil, err
+			}
 		}
-		parent, err := current.Parent(0)
-		if err != nil {
-			break
+	} else {
+		// Normal case: walk first-parent chain only from HEAD
+		if err := r.walkFirstParent(ctx, headCommit, depth, seen, &commits); err != nil {
+			return nil, err
 		}
-		current = parent
 	}
 
 	if len(commits) == 0 {
 		return nil, domain.ErrEmptyAncestry
 	}
 
-	r.logger.Debug(ctx, "walked commit ancestry (first-parent)", map[string]interface{}{
+	r.logger.Debug(ctx, "walked commit ancestry", map[string]interface{}{
 		"depth_requested": depth,
 		"commits_found":   len(commits),
 		"head_sha":        commits[0],
@@ -164,6 +180,45 @@ func (r *GoGitRepository) GetCommitAncestry(ctx context.Context, depth int) ([]s
 // Close releases any resources held by the repository.
 // For go-git, this is a no-op as the repository doesn't hold persistent resources.
 func (r *GoGitRepository) Close() error {
+	return nil
+}
+
+// walkFirstParent walks the first-parent chain from start, appending at most
+// limit unseen commit SHAs to commits. The seen map is used to deduplicate
+// across multiple walks (e.g., when parent chains converge).
+func (r *GoGitRepository) walkFirstParent(
+	ctx context.Context,
+	start *object.Commit,
+	limit int,
+	seen map[string]bool,
+	commits *[]string,
+) error {
+	current := start
+	walked := 0
+	for walked < limit {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		sha := current.Hash.String()
+		if seen[sha] {
+			break
+		}
+		seen[sha] = true
+		*commits = append(*commits, sha)
+		walked++
+
+		if current.NumParents() == 0 {
+			break
+		}
+		parent, err := current.Parent(0)
+		if err != nil {
+			return fmt.Errorf("failed to get parent commit: %w", err)
+		}
+		current = parent
+	}
 	return nil
 }
 

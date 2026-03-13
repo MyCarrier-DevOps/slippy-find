@@ -1,7 +1,7 @@
 # Project State — slippy-find Application
 
-> **Last Updated:** 2026-02-26
-> **Status:** Production ready; maintenance validation passed on Go 1.26
+> **Last Updated:** 2026-03-13
+> **Status:** Production ready; fix for detached merge commit ancestry walk in CI
 
 ## Overview
 
@@ -39,6 +39,15 @@
 | usecases | 100% |
 
 ## Recent Changes
+
+### 2026-03-13: Fix Detached Merge Commit Ancestry Walk (CI PR Checkout)
+- **Root cause:** GitHub Actions `actions/checkout` creates a merge commit in detached HEAD state for PRs. Parent 0 is the base branch, parent 1 is the feature branch. The first-parent-only walk was following only the base branch, never reaching feature branch commits where the routing slip was created.
+- Modified `GetCommitAncestry` in `internal/adapters/git/gogit.go` to detect detached merge commits and walk **all** parent chains independently (each following first-parent)
+- Extracted `walkFirstParent` helper method for reusable first-parent chain walking
+- Added `github.com/go-git/go-git/v5/plumbing/object` import for explicit `*object.Commit` type usage
+- Added integration test `TestGoGitRepository_GetCommitAncestry_DetachedMergeCommit` verifying both base and feature branch commits are found
+- Existing `TestGoGitRepository_GetCommitAncestry_FirstParentOnly` continues to pass (non-detached merge behavior preserved)
+- All tests pass with race detection; golangci-lint zero issues
 
 ### 2026-02-26: Not-Found Error Normalization for slippy FindByCommits
 - Updated `internal/adapters/store/clickhouse.go` to map `slippy.ErrSlipNotFound` to `(nil, "", nil)` in `ClickHouseAdapter.FindByCommits`
@@ -117,7 +126,8 @@ Dependency injection refactoring complete. All core functionality implemented an
 ### AD-003: Detached HEAD Handling
 - **Decision:** Warn to stderr and continue when HEAD is detached (not on a branch)
 - **Rationale:** Slip resolution can still work with commit SHA ancestry; branch name is informational
-- **Trade-offs:** Branch-specific slip matching may be degraded
+- **Enhancement (2026-03-13):** When HEAD is a detached **merge commit** (typical of CI PR checkout), walk all parent chains so both base and feature branch commits are searched
+- **Trade-offs:** Branch-specific slip matching may be degraded; merge commit walks return more commits than depth (up to `1 + depth * num_parents`)
 
 ### AD-004: Pipeline Config from Vault (Preferred)
 - **Decision:** Pipeline configuration loaded from HashiCorp Vault using AppRole authentication; file-based loading as fallback

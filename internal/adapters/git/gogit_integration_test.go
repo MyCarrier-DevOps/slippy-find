@@ -361,3 +361,68 @@ func getGitOutput(t *testing.T, dir string, args ...string) string {
 	require.NoError(t, err, "git %v failed", args)
 	return strings.TrimSpace(string(output))
 }
+
+// TestGoGitRepository_GetCommitAncestry_DetachedMergeCommit tests the CI scenario
+// where GitHub Actions checks out a pull request merge commit in detached HEAD state.
+// In this case, the merge commit has two parents: the base branch (first parent) and
+// the feature branch (second parent). Both parent chains must be walked to find the
+// routing slip, which is typically associated with a feature branch commit.
+func TestGoGitRepository_GetCommitAncestry_DetachedMergeCommit(t *testing.T) {
+	repoPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	// Capture the default branch name
+	defaultBranch := getGitOutput(t, repoPath, "branch", "--show-current")
+
+	// Add a second commit to the default branch (base branch)
+	baseFile := filepath.Join(repoPath, "base.txt")
+	require.NoError(t, os.WriteFile(baseFile, []byte("base work 1"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Base commit 1")
+	baseCommit1 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Create a feature branch from the initial commit
+	runGit(t, repoPath, "checkout", "-b", "feature-branch", "HEAD~1")
+	featureFile := filepath.Join(repoPath, "feature.txt")
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature work 1"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Feature commit 1")
+	featureCommit1 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature work 2"), 0o644))
+	runGit(t, repoPath, "add", ".")
+	runGit(t, repoPath, "commit", "-m", "Feature commit 2")
+	featureCommit2 := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Switch back to the default branch and create a merge commit
+	// This simulates what actions/checkout does for PRs
+	runGit(t, repoPath, "checkout", defaultBranch)
+	runGit(t, repoPath, "merge", "feature-branch", "--no-ff", "-m", "Merge feature into base")
+	mergeCommit := getGitOutput(t, repoPath, "rev-parse", "HEAD")
+
+	// Detach HEAD at the merge commit (simulating actions/checkout for a PR)
+	runGit(t, repoPath, "checkout", "--detach", "HEAD")
+
+	log := &testLogger{}
+	repo, err := NewGoGitRepository(repoPath, log)
+	require.NoError(t, err)
+	defer repo.Close()
+
+	ctx := context.Background()
+	commits, err := repo.GetCommitAncestry(ctx, 25)
+
+	require.NoError(t, err)
+
+	// The merge commit itself should be included
+	assert.Contains(t, commits, mergeCommit, "merge commit should be in ancestry")
+
+	// Base branch commit should be reachable (first parent chain)
+	assert.Contains(t, commits, baseCommit1, "base branch commit should be in ancestry")
+
+	// Feature branch commits should ALSO be reachable (second parent chain)
+	assert.Contains(t, commits, featureCommit1, "feature commit 1 should be in ancestry")
+	assert.Contains(t, commits, featureCommit2, "feature commit 2 should be in ancestry")
+
+	// Merge commit should be first (HEAD)
+	assert.Equal(t, mergeCommit, commits[0], "HEAD (merge commit) should be first")
+}
