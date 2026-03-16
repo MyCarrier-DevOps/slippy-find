@@ -185,11 +185,12 @@ func TestLoad_DefaultDatabase(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
 	require.NoError(t, err)
 
-	// Set required env vars, but not database
+	// Set required env vars, but not database or webhook target
 	setClickHouseEnvVars(t)
 	t.Setenv(EnvPipelineConfig, configPath)
 	os.Unsetenv(EnvVaultPipelineConfigPath)
 	os.Unsetenv(EnvDatabase)
+	os.Unsetenv(EnvWebhookTarget)
 
 	// Act
 	cfg, err := Load()
@@ -219,6 +220,112 @@ func TestLoad_CustomDatabase(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "production", cfg.Database)
+}
+
+func TestLoad_WebhookTargetTestURL_UsesTestDatabase(t *testing.T) {
+	// Create a temp file with valid pipeline config JSON
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "pipeline.json")
+	validConfig := `{"version":"1","name":"test","steps":[{"name":"step1","description":"desc"}]}`
+	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
+	require.NoError(t, err)
+
+	// Set webhook target to test URL without explicit database
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, configPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+	os.Unsetenv(EnvDatabase)
+	t.Setenv(EnvWebhookTarget, TestWebhookTarget)
+
+	// Act
+	cfg, err := Load()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, TestDatabase, cfg.Database)
+}
+
+func TestLoad_WebhookTargetNonTestURL_UsesDefaultDatabase(t *testing.T) {
+	// Create a temp file with valid pipeline config JSON
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "pipeline.json")
+	validConfig := `{"version":"1","name":"test","steps":[{"name":"step1","description":"desc"}]}`
+	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
+	require.NoError(t, err)
+
+	// Set webhook target to a non-test URL without explicit database
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, configPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+	os.Unsetenv(EnvDatabase)
+	t.Setenv(EnvWebhookTarget, DefaultWebhookTarget)
+
+	// Act
+	cfg, err := Load()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, DefaultDatabase, cfg.Database)
+}
+
+func TestLoad_ExplicitDatabaseOverridesWebhookTarget(t *testing.T) {
+	// Create a temp file with valid pipeline config JSON
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "pipeline.json")
+	validConfig := `{"version":"1","name":"test","steps":[{"name":"step1","description":"desc"}]}`
+	err := os.WriteFile(configPath, []byte(validConfig), 0o644)
+	require.NoError(t, err)
+
+	// Set both webhook target (test URL) and explicit database
+	setClickHouseEnvVars(t)
+	t.Setenv(EnvPipelineConfig, configPath)
+	os.Unsetenv(EnvVaultPipelineConfigPath)
+	t.Setenv(EnvDatabase, "custom_db")
+	t.Setenv(EnvWebhookTarget, TestWebhookTarget)
+
+	// Act
+	cfg, err := Load()
+
+	// Assert - explicit database should win over webhook target
+	require.NoError(t, err)
+	assert.Equal(t, "custom_db", cfg.Database)
+}
+
+func TestResolveDatabase(t *testing.T) {
+	tests := []struct {
+		name          string
+		webhookTarget string
+		wantDatabase  string
+	}{
+		{
+			name:          "test webhook target returns test database",
+			webhookTarget: TestWebhookTarget,
+			wantDatabase:  TestDatabase,
+		},
+		{
+			name:          "production webhook target returns default database",
+			webhookTarget: DefaultWebhookTarget,
+			wantDatabase:  DefaultDatabase,
+		},
+		{
+			name:          "empty webhook target returns default database",
+			webhookTarget: "",
+			wantDatabase:  DefaultDatabase,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.webhookTarget != "" {
+				t.Setenv(EnvWebhookTarget, tt.webhookTarget)
+			} else {
+				os.Unsetenv(EnvWebhookTarget)
+			}
+
+			got := resolveDatabase()
+			assert.Equal(t, tt.wantDatabase, got)
+		})
+	}
 }
 
 // Vault integration tests

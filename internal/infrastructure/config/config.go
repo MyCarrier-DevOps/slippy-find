@@ -24,6 +24,9 @@ const (
 	// EnvDatabase is the ClickHouse database name for slip storage.
 	EnvDatabase = "SLIPPY_DATABASE"
 
+	// EnvWebhookTarget is the repository custom property indicating the webhook target URL.
+	EnvWebhookTarget = "WEBHOOK_TARGET"
+
 	// EnvLogLevel is the log level (debug, info, error).
 	EnvLogLevel = "LOG_LEVEL"
 
@@ -43,6 +46,13 @@ const (
 	DefaultLogAppName         = "slippy-find"
 	DefaultDatabase           = "ci"
 	DefaultVaultPipelineMount = "secret"
+	DefaultWebhookTarget      = "https://webhook.mycarrier.tech"
+
+	// TestWebhookTarget is the webhook target URL that indicates a test environment.
+	TestWebhookTarget = "https://test-webhook.mycarrier.tech"
+
+	// TestDatabase is the database name used when the webhook target is the test URL.
+	TestDatabase = "ci_test"
 )
 
 // Configuration errors.
@@ -158,10 +168,11 @@ func LoadWithVaultClient(ctx context.Context, vaultClientFactory VaultClientFact
 		logAppName = DefaultLogAppName
 	}
 
-	// Get database name with default
+	// Get database name with default.
+	// Priority: explicit SLIPPY_DATABASE > webhook-target override > default.
 	database := os.Getenv(EnvDatabase)
 	if database == "" {
-		database = DefaultDatabase
+		database = resolveDatabase()
 	}
 
 	return &Config{
@@ -289,4 +300,13 @@ func loadPipelineConfigFromFile(path string) (*slippy.PipelineConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// resolveDatabase determines the database name based on the webhook-target custom property.
+// Returns TestDatabase when the webhook target matches TestWebhookTarget, otherwise DefaultDatabase.
+func resolveDatabase() string {
+	if os.Getenv(EnvWebhookTarget) == TestWebhookTarget {
+		return TestDatabase
+	}
+	return DefaultDatabase
 }

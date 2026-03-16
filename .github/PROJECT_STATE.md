@@ -1,7 +1,7 @@
 # Project State — slippy-find Application
 
-> **Last Updated:** 2026-03-13
-> **Status:** Production ready; fix for detached merge commit ancestry walk in CI
+> **Last Updated:** 2026-03-16
+> **Status:** Production ready; webhook-target custom property support for test database selection
 
 ## Overview
 
@@ -39,6 +39,15 @@
 | usecases | 100% |
 
 ## Recent Changes
+
+### 2026-03-16: Webhook-Target Custom Property Database Selection
+- Added `WEBHOOK_TARGET` environment variable support for GitHub repository custom property
+- When `WEBHOOK_TARGET` is `https://test-webhook.mycarrier.tech`, the database defaults to `ci_test` instead of `ci`
+- Explicit `SLIPPY_DATABASE` env var still takes highest priority
+- Added `resolveDatabase()` function in `internal/infrastructure/config/config.go`
+- Added constants: `EnvWebhookTarget`, `TestWebhookTarget`, `TestDatabase`
+- Added tests: `TestLoad_WebhookTargetTestURL_UsesTestDatabase`, `TestLoad_WebhookTargetNonTestURL_UsesDefaultDatabase`, `TestLoad_ExplicitDatabaseOverridesWebhookTarget`, `TestResolveDatabase` table-driven test
+- All tests pass with race detection; golangci-lint zero issues; config coverage 85.9%
 
 ### 2026-03-13: Fix Detached Merge Commit Ancestry Walk (CI PR Checkout)
 - **Root cause:** GitHub Actions `actions/checkout` creates a merge commit in detached HEAD state for PRs. Parent 0 is the base branch, parent 1 is the feature branch. The first-parent-only walk was following only the base branch, never reaching feature branch commits where the routing slip was created.
@@ -181,7 +190,12 @@ Dependency injection refactoring complete. All core functionality implemented an
 ### Slip Storage Configuration
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `SLIPPY_DATABASE` | ClickHouse database name for slip storage | No (defaults to "ci") |
+| `SLIPPY_DATABASE` | ClickHouse database name for slip storage (overrides webhook-target) | No (defaults to "ci") |
+
+### Webhook Target Configuration
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `WEBHOOK_TARGET` | Repository custom property for webhook target URL. When set to `https://test-webhook.mycarrier.tech`, database defaults to `ci_test` | No |
 
 ### Vault Configuration (Preferred for Pipeline Config)
 | Variable | Description | Required |
