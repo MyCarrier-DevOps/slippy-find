@@ -7,7 +7,7 @@ require (
 	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.65
 	github.com/MyCarrier-DevOps/goLibMyCarrier/slippy v1.3.65
 	github.com/MyCarrier-DevOps/goLibMyCarrier/vault v1.3.65
-	github.com/go-git/go-git/v5 v5.16.5
+	github.com/go-git/go-git/v5 v5.17.1
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.11.1
 )
@@ -31,7 +31,7 @@ require (
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.7.0 // indirect
+	github.com/go-git/go-billy/v5 v5.8.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
