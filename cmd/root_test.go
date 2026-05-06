@@ -194,7 +194,7 @@ func TestRootCmd_GitRepoError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return nil, domain.ErrRepositoryNotFound
@@ -216,7 +216,7 @@ func TestRootCmd_SlipFinderError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -244,7 +244,7 @@ func TestRootCmd_ResolveError_NoSlipFound(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -276,7 +276,7 @@ func TestRootCmd_ResolveError_NoOrigin(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -307,7 +307,7 @@ func TestRootCmd_OutputWriteError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -347,7 +347,7 @@ func TestRootCmd_Success(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -392,7 +392,7 @@ func TestRootCmd_Success_WithDepthFlag(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -431,7 +431,7 @@ func TestRootCmd_Success_WithVerboseFlag(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -471,7 +471,7 @@ func TestRootCmd_WithCustomPath(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(path string, _ Logger) (domain.LocalGitRepository, error) {
 			receivedPath = path

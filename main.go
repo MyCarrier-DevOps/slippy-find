@@ -6,9 +6,7 @@ package main
 import (
 	"os"
 
-	ch "github.com/MyCarrier-DevOps/goLibMyCarrier/clickhouse"
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/logger"
-	"github.com/MyCarrier-DevOps/goLibMyCarrier/slippy"
 
 	"github.com/MyCarrier-DevOps/slippy-find/cmd"
 	"github.com/MyCarrier-DevOps/slippy-find/internal/adapters/git"
@@ -21,11 +19,9 @@ import (
 )
 
 func main() {
-	// Create a single shared logger instance for the application
 	zapLog := logger.NewZapLoggerFromConfig()
 	adapter := logadapter.NewZapAdapter(zapLog)
 
-	// Wire up production dependencies
 	deps := &cmd.Dependencies{
 		LoggerFactory: func() cmd.Logger {
 			return adapter
@@ -37,11 +33,10 @@ func main() {
 				return nil, err
 			}
 			return &cmd.AppConfig{
-				ClickHouseConfig: cfg.ClickHouse,
-				PipelineConfig:   cfg.PipelineConfig,
-				Database:         cfg.Database,
-				LogLevel:         cfg.LogLevel,
-				LogAppName:       cfg.LogAppName,
+				SlippyAPIURL: cfg.SlippyAPIURL,
+				SlippyAPIKey: cfg.SlippyAPIKey,
+				LogLevel:     cfg.LogLevel,
+				LogAppName:   cfg.LogAppName,
 			}, nil
 		},
 
@@ -50,26 +45,7 @@ func main() {
 		},
 
 		SlipFinderFactory: func(cfg *cmd.AppConfig, _ cmd.Logger) (domain.SlipFinder, error) {
-			chConfig, ok := cfg.ClickHouseConfig.(*ch.ClickhouseConfig)
-			if !ok {
-				return nil, newConfigTypeError("*ch.ClickhouseConfig")
-			}
-
-			pipelineCfg, ok := cfg.PipelineConfig.(*slippy.PipelineConfig)
-			if !ok {
-				return nil, newConfigTypeError("*slippy.PipelineConfig")
-			}
-
-			slippyStore, err := slippy.NewClickHouseStoreFromConfig(chConfig, slippy.ClickHouseStoreOptions{
-				PipelineConfig: pipelineCfg,
-				Database:       cfg.Database,
-				Logger:         zapLog,
-				SkipMigrations: true,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return store.NewClickHouseAdapter(slippyStore), nil
+			return store.NewSlipAPIAdapter(cfg.SlippyAPIURL, cfg.SlippyAPIKey)
 		},
 
 		ResolverFactory: func(
@@ -90,17 +66,4 @@ func main() {
 
 	cmd.SetDefaultDependencies(deps)
 	cmd.Execute()
-}
-
-func newConfigTypeError(expected string) error {
-	return &configTypeError{expected: expected}
-}
-
-// configTypeError is returned when configuration type assertion fails.
-type configTypeError struct {
-	expected string
-}
-
-func (e *configTypeError) Error() string {
-	return "invalid configuration type: expected " + e.expected
 }
