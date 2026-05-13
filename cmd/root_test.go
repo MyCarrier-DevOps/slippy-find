@@ -194,7 +194,7 @@ func TestRootCmd_GitRepoError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return nil, domain.ErrRepositoryNotFound
@@ -216,7 +216,7 @@ func TestRootCmd_SlipFinderError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -244,7 +244,7 @@ func TestRootCmd_ResolveError_NoSlipFound(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -276,7 +276,7 @@ func TestRootCmd_ResolveError_NoOrigin(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -307,7 +307,7 @@ func TestRootCmd_OutputWriteError(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -347,7 +347,7 @@ func TestRootCmd_Success(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -392,7 +392,7 @@ func TestRootCmd_Success_WithDepthFlag(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -431,7 +431,7 @@ func TestRootCmd_Success_WithVerboseFlag(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
 			return mockGit, nil
@@ -471,7 +471,7 @@ func TestRootCmd_WithCustomPath(t *testing.T) {
 	deps := &Dependencies{
 		LoggerFactory: func() Logger { return &mockLogger{} },
 		ConfigLoader: func() (*AppConfig, error) {
-			return &AppConfig{Database: "ci"}, nil
+			return &AppConfig{}, nil
 		},
 		GitRepoFactory: func(path string, _ Logger) (domain.LocalGitRepository, error) {
 			receivedPath = path
@@ -501,6 +501,47 @@ func TestRootCmd_WithCustomPath(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "/custom/repo/path", receivedPath)
+}
+
+// TestRootCmd_WiresSlippyAPIConfigToFactory pins the ConfigLoader → AppConfig →
+// SlipFinderFactory contract. A regression that drops or renames SlippyAPIURL or
+// SlippyAPIKey between the loader and the factory call site would fail this test.
+func TestRootCmd_WiresSlippyAPIConfigToFactory(t *testing.T) {
+	mockGit := &mockGitRepo{}
+	mockFinder := &mockSlipFinder{}
+	mockWriter := &mockOutputWriter{}
+
+	var seenURL, seenKey string
+	deps := &Dependencies{
+		LoggerFactory: func() Logger { return &mockLogger{} },
+		ConfigLoader: func() (*AppConfig, error) {
+			return &AppConfig{
+				SlippyAPIURL: "http://test.example/v1",
+				SlippyAPIKey: "tkn",
+			}, nil
+		},
+		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
+			return mockGit, nil
+		},
+		SlipFinderFactory: func(cfg *AppConfig, _ Logger) (domain.SlipFinder, error) {
+			seenURL = cfg.SlippyAPIURL
+			seenKey = cfg.SlippyAPIKey
+			return mockFinder, nil
+		},
+		ResolverFactory: func(_ domain.LocalGitRepository, _ domain.SlipFinder, _ Logger) domain.Resolver {
+			return &mockResolver{output: &domain.ResolveOutput{CorrelationID: "wired-id"}}
+		},
+		OutputWriterFactory: func() domain.OutputWriter { return mockWriter },
+		Stdout:              io.Discard,
+		Stderr:              io.Discard,
+	}
+
+	cmd := NewRootCmdWithDeps(deps)
+	cmd.SetArgs([]string{"."})
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, "http://test.example/v1", seenURL)
+	assert.Equal(t, "tkn", seenKey)
 }
 
 func TestWriteWarningf(t *testing.T) {

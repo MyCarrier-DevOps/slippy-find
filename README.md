@@ -4,15 +4,14 @@ A Go CLI application that resolves routing slips from local Git repository commi
 
 ## Overview
 
-`slippy-find` walks the commit ancestry of a local Git repository to find the most recent routing slip associated with any commit in the history. It queries a ClickHouse database (using `goLibMyCarrier/slippy`) to match commits and returns the correlation ID for pipeline orchestration.
+`slippy-find` walks the commit ancestry of a local Git repository and asks the **slippy-api** service for the most recent routing slip associated with any commit in the history. On success it prints the matching `correlation_id` to stdout for pipeline orchestration.
 
 ### Key Features
 
-- **Local Git operations only** — No GitHub API calls; works entirely with local repositories
-- **Commit ancestry walking** — Uses `go-git/v5` to traverse commit history from HEAD
-- **ClickHouse integration** — Queries slip store via `goLibMyCarrier/slippy`
-- **Vault integration** — Loads pipeline configuration from HashiCorp Vault using AppRole authentication
-- **Clean architecture** — Full dependency injection for testability
+- **Local Git operations only** — no GitHub API calls; works entirely with local repositories
+- **Commit ancestry walking** — uses `go-git/v5` to traverse commit history from HEAD
+- **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 30s timeout)
+- **Clean architecture** — full dependency injection for testability
 
 ## Installation
 
@@ -32,8 +31,8 @@ Use the provided action to install pre-built binaries (fastest):
 
 - name: Run slippy-find
   env:
-    VAULT_ADDRESS: ${{ secrets.VAULT_ADDRESS }}
-    # ... other env vars
+    SLIPPY_API_URL: ${{ vars.SLIPPY_API_URL }}
+    SLIPPY_API_KEY: ${{ secrets.SLIPPY_API_KEY }}
   run: slippy-find
 ```
 
@@ -101,92 +100,33 @@ CORRELATION_ID=$(slippy-find)
 
 ## Configuration
 
-### Pipeline Configuration (Required)
+All configuration is supplied via environment variables. There is no Vault dependency, no ClickHouse connection, and no pipeline-config file — slippy-find talks to slippy-api over HTTP.
 
-Pipeline configuration can be loaded from **HashiCorp Vault** (preferred) or a **local file** (fallback).
+### Required
 
-#### Option 1: Vault (Preferred)
+| Variable | Description |
+|----------|-------------|
+| `SLIPPY_API_URL` | Base URL of the slippy-api service (e.g. `http://slippy-api/v1`). Must include scheme and host. |
+| `SLIPPY_API_KEY` | Bearer token sent as `Authorization: Bearer <token>` on every request. |
 
-Set the following environment variables:
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VAULT_ADDRESS` | HashiCorp Vault server address | Yes |
-| `VAULT_ROLE_ID` | AppRole role ID for authentication | Yes |
-| `VAULT_SECRET_ID` | AppRole secret ID for authentication | Yes |
-| `VAULT_PIPELINE_CONFIG_PATH` | Path to pipeline config in Vault KV (supports `path#key` syntax) | Yes |
-| `VAULT_PIPELINE_CONFIG_MOUNT` | KV mount point | No (default: `secret`) |
-
-**Path Syntax:**
-
-The `VAULT_PIPELINE_CONFIG_PATH` supports an optional key suffix using `#` to specify which key in the secret contains the pipeline config:
-
-- `ci/slippy/pipeline` — Uses the default `config` key
-- `ci/slippy/pipeline#config` — Explicitly uses the `config` key
-- `DevOps/slippy/config#mykey` — Uses the `mykey` key
-
-The pipeline config in Vault can be stored as:
-- A JSON string in the specified key (or `config` by default)
-- Direct field mapping in the secret (fallback)
-
-#### Option 2: Local File (Fallback)
-
-If Vault environment variables are not set, falls back to file-based configuration:
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SLIPPY_PIPELINE_CONFIG` | Path to pipeline config JSON file | Yes |
-
-### ClickHouse Configuration (Required)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `CLICKHOUSE_HOSTNAME` | ClickHouse server hostname | Yes |
-| `CLICKHOUSE_PORT` | ClickHouse server port | Yes |
-| `CLICKHOUSE_USERNAME` | ClickHouse username | Yes |
-| `CLICKHOUSE_PASSWORD` | ClickHouse password | Yes |
-| `CLICKHOUSE_SKIP_VERIFY` | Skip TLS verification | No |
-
-### Slip Storage Configuration (Optional)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SLIPPY_DATABASE` | ClickHouse database name for slip storage | `ci` |
-
-### Logging Configuration (Optional)
+### Optional
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LOG_LEVEL` | Log level (`debug`, `info`, `error`) | `info` |
-| `LOG_APP_NAME` | Application name for logs | `slippy-find` |
+| `LOG_APP_NAME` | Application name for log context | `slippy-find` |
 
-## Example Configuration
+### Database Selection (Test vs. Prod)
 
-### Using Vault
+Database selection is now the responsibility of **slippy-api**, which derives it from its own `K8S_NAMESPACE`. To read slips from the `ci_test` database, point `SLIPPY_API_URL` at the slippy-api deployment in the `slippy-api-test` namespace.
 
-```bash
-export VAULT_ADDRESS="https://vault.example.com"
-export VAULT_ROLE_ID="your-role-id"
-export VAULT_SECRET_ID="your-secret-id"
-export VAULT_PIPELINE_CONFIG_PATH="ci/slippy/pipeline-config#config"
+> **Migration note (v1.4.x cutover):** the pre-cutover `WEBHOOK_TARGET=https://test-webhook.mycarrier.tech` selector that routed reads to `ci_test` is gone from this binary. Setting `WEBHOOK_TARGET` on the slippy-find invocation is now a **no-op**. Workflow steps that previously relied on it must instead set `SLIPPY_API_URL` to the test-namespace slippy-api. The same `CLICKHOUSE_*`, `VAULT_*`, and `SLIPPY_PIPELINE_CONFIG` variables are also unused and should be removed from any workflow template that runs slippy-find.
 
-export CLICKHOUSE_HOSTNAME="clickhouse.example.com"
-export CLICKHOUSE_PORT="9440"
-export CLICKHOUSE_USERNAME="default"
-export CLICKHOUSE_PASSWORD="your-password"
-
-slippy-find
-```
-
-### Using Local File
+## Example
 
 ```bash
-export SLIPPY_PIPELINE_CONFIG="/path/to/pipeline.json"
-
-export CLICKHOUSE_HOSTNAME="clickhouse.example.com"
-export CLICKHOUSE_PORT="9440"
-export CLICKHOUSE_USERNAME="default"
-export CLICKHOUSE_PASSWORD="your-password"
+export SLIPPY_API_URL="http://slippy-api.svc.cluster.local/v1"
+export SLIPPY_API_KEY="$(get-secret slippy-api-token)"
 
 slippy-find
 ```
@@ -196,13 +136,13 @@ slippy-find
 | Code | Description |
 |------|-------------|
 | 0 | Success — correlation ID written to stdout |
-| 1 | Error — no slip found or configuration/connection error |
+| 1 | Error — no slip found, configuration error, auth failure, or transport error |
 
 ## Requirements
 
 - Local Git repository with `origin` remote configured
-- ClickHouse database with slip store schema
-- Pipeline configuration (via Vault or local file)
+- Network access to a slippy-api instance
+- A valid slippy-api bearer token
 
 ## Architecture
 
@@ -212,10 +152,10 @@ internal/
   adapters/
     git/                # go-git/v5 adapter for local Git operations
     output/             # stdout writer for correlation ID
-    store/              # ClickHouse adapter bridging slippy.SlipStore
+    store/              # slippy-api HTTP adapter (SlipAPIAdapter)
   domain/               # Domain interfaces and entities
   infrastructure/
-    config/             # Configuration loading (Vault + file)
+    config/             # Environment-variable configuration loader
   usecases/             # Slip resolution business logic
 main.go                 # Production dependency wiring
 ```
@@ -224,7 +164,7 @@ main.go                 # Production dependency wiring
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.26+
 - golangci-lint
 
 ### Running Tests

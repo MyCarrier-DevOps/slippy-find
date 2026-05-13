@@ -55,14 +55,11 @@ type Dependencies struct {
 
 // AppConfig holds application configuration loaded by ConfigLoader.
 type AppConfig struct {
-	// ClickHouseConfig is passed to the SlipFinderFactory.
-	ClickHouseConfig any
+	// SlippyAPIURL is the base URL of the slippy-api service.
+	SlippyAPIURL string
 
-	// PipelineConfig is passed to the SlipFinderFactory.
-	PipelineConfig any
-
-	// Database is the database name.
-	Database string
+	// SlippyAPIKey is the Bearer token for authenticating slip read requests.
+	SlippyAPIKey string
 
 	// LogLevel is the log level setting.
 	LogLevel string
