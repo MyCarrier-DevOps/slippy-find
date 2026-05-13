@@ -27,7 +27,9 @@ const (
 
 // Configuration errors.
 var (
-	ErrSlippyAPIURLRequired = errors.New("SLIPPY_API_URL is required")
+	ErrSlippyAPIURLRequired = errors.New(
+		"SLIPPY_API_URL is required (set explicitly, or set K8S_NAMESPACE to a known slippy-api cluster: argo-events / argo-events-test)",
+	)
 	ErrSlippyAPIKeyRequired = errors.New("SLIPPY_API_KEY is required")
 )
 
