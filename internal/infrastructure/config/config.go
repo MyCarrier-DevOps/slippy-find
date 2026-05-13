@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
+
+	slippyapi "github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi"
 )
 
 // Environment variable names.
@@ -46,8 +47,13 @@ type Config struct {
 }
 
 // Load loads the application configuration from environment variables.
+//
+// SLIPPY_API_URL resolution is delegated to
+// goLibMyCarrier/slippyapi.ResolveAPIURL: explicit SLIPPY_API_URL wins,
+// otherwise K8S_NAMESPACE maps to a known cluster, and an unknown
+// namespace returns an error. See that package for the full contract.
 func Load() (*Config, error) {
-	apiURL, err := resolveSlippyAPIURL()
+	apiURL, err := slippyapi.ResolveAPIURL()
 	if err != nil {
 		return nil, err
 	}
@@ -79,38 +85,4 @@ func Load() (*Config, error) {
 		LogLevel:     logLevel,
 		LogAppName:   logAppName,
 	}, nil
-}
-
-// resolveSlippyAPIURL returns the slippy-api base URL.
-//
-// Resolution order:
-//  1. SLIPPY_API_URL (explicit override — integration tests, local dev,
-//     in-cluster URLs). Honored verbatim.
-//  2. K8S_NAMESPACE mapped to the cluster's slippy-api URL.
-//  3. ("", nil) when K8S_NAMESPACE is unset / empty / whitespace.
-//     Load() then surfaces the existing ErrSlippyAPIURLRequired error.
-//  4. ("", error) when K8S_NAMESPACE is non-empty but unknown —
-//     operator typo / new cluster, fail fast.
-//
-// NOTE: this inline helper will be replaced by
-// goLibMyCarrier/slippy.ResolveAPIURL once that helper is tagged
-// (MyCarrier-DevOps/goLibMyCarrier#60).
-func resolveSlippyAPIURL() (string, error) {
-	if explicit := strings.TrimSpace(os.Getenv(EnvSlippyAPIURL)); explicit != "" {
-		return explicit, nil
-	}
-	ns := strings.TrimSpace(os.Getenv(EnvK8sNamespace))
-	switch ns {
-	case "":
-		return "", nil
-	case "argo-events":
-		return "https://slippy-api.api.mycarrier.tech/v1", nil
-	case "argo-events-test":
-		return "https://slippy-api-test.api.mycarrier.tech/v1", nil
-	default:
-		return "", fmt.Errorf(
-			"slippy: K8S_NAMESPACE=%q is not a known slippy-api cluster; set %s explicitly to override",
-			ns, EnvSlippyAPIURL,
-		)
-	}
 }
