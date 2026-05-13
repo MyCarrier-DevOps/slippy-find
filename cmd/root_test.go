@@ -503,6 +503,47 @@ func TestRootCmd_WithCustomPath(t *testing.T) {
 	assert.Equal(t, "/custom/repo/path", receivedPath)
 }
 
+// TestRootCmd_WiresSlippyAPIConfigToFactory pins the ConfigLoader → AppConfig →
+// SlipFinderFactory contract. A regression that drops or renames SlippyAPIURL or
+// SlippyAPIKey between the loader and the factory call site would fail this test.
+func TestRootCmd_WiresSlippyAPIConfigToFactory(t *testing.T) {
+	mockGit := &mockGitRepo{}
+	mockFinder := &mockSlipFinder{}
+	mockWriter := &mockOutputWriter{}
+
+	var seenURL, seenKey string
+	deps := &Dependencies{
+		LoggerFactory: func() Logger { return &mockLogger{} },
+		ConfigLoader: func() (*AppConfig, error) {
+			return &AppConfig{
+				SlippyAPIURL: "http://test.example/v1",
+				SlippyAPIKey: "tkn",
+			}, nil
+		},
+		GitRepoFactory: func(_ string, _ Logger) (domain.LocalGitRepository, error) {
+			return mockGit, nil
+		},
+		SlipFinderFactory: func(cfg *AppConfig, _ Logger) (domain.SlipFinder, error) {
+			seenURL = cfg.SlippyAPIURL
+			seenKey = cfg.SlippyAPIKey
+			return mockFinder, nil
+		},
+		ResolverFactory: func(_ domain.LocalGitRepository, _ domain.SlipFinder, _ Logger) domain.Resolver {
+			return &mockResolver{output: &domain.ResolveOutput{CorrelationID: "wired-id"}}
+		},
+		OutputWriterFactory: func() domain.OutputWriter { return mockWriter },
+		Stdout:              io.Discard,
+		Stderr:              io.Discard,
+	}
+
+	cmd := NewRootCmdWithDeps(deps)
+	cmd.SetArgs([]string{"."})
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, "http://test.example/v1", seenURL)
+	assert.Equal(t, "tkn", seenKey)
+}
+
 func TestWriteWarningf(t *testing.T) {
 	t.Run("writes formatted warning to writer", func(t *testing.T) {
 		var buf bytes.Buffer

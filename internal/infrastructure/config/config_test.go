@@ -45,6 +45,30 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, DefaultLogAppName, cfg.LogAppName)
 }
 
+func TestLoad_InvalidAPIURL(t *testing.T) {
+	cases := []struct {
+		name  string
+		value string
+	}{
+		{"no scheme", "slippy-api.example.com"},
+		{"only scheme", "https://"},
+		{"trailing newline", "http://slippy-api/v1\n"},
+		{"embedded whitespace", "http://slippy api/v1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv(EnvSlippyAPIURL, tc.value)
+			t.Setenv(EnvSlippyAPIKey, "test-key")
+
+			_, err := Load()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), EnvSlippyAPIURL)
+			assert.Contains(t, err.Error(), "valid http")
+		})
+	}
+}
+
 func TestLoad_CustomLogSettings(t *testing.T) {
 	clearEnv(t)
 	t.Setenv(EnvSlippyAPIURL, "http://slippy-api/v1")

@@ -42,6 +42,15 @@ func TestSlipAPIAdapter_FindByCommits_Success(t *testing.T) {
 	_, adapter := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/slips/find-by-commits", r.URL.Path)
+		assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+
+		var got struct {
+			Repository string   `json:"repository"`
+			Commits    []string `json:"commits"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		assert.Equal(t, "org/repo", got.Repository)
+		assert.Equal(t, []string{"abc123"}, got.Commits)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -57,6 +66,22 @@ func TestSlipAPIAdapter_FindByCommits_Success(t *testing.T) {
 	require.NotNil(t, slip)
 	assert.Equal(t, "test-correlation-id", slip.CorrelationID)
 	assert.Equal(t, "abc123", matchedCommit)
+}
+
+func TestSlipAPIAdapter_FindByCommits_Unauthorized_SurfacesAuthHint(t *testing.T) {
+	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"title":  "Unauthorized",
+			"detail": "invalid bearer token",
+		})
+	})
+
+	_, _, err := adapter.FindByCommits(context.Background(), "org/repo", []string{"abc123"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SLIPPY_API_KEY")
+	assert.Contains(t, err.Error(), "invalid bearer token")
 }
 
 func TestSlipAPIAdapter_FindByCommits_NotFound(t *testing.T) {

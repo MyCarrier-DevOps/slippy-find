@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 )
 
@@ -47,6 +48,9 @@ func Load() (*Config, error) {
 	apiURL := os.Getenv(EnvSlippyAPIURL)
 	if apiURL == "" {
 		return nil, fmt.Errorf("%w", ErrSlippyAPIURLRequired)
+	}
+	if u, err := url.Parse(apiURL); err != nil || u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("%s must be a valid http(s):// URL, got %q", EnvSlippyAPIURL, apiURL)
 	}
 
 	apiKey := os.Getenv(EnvSlippyAPIKey)

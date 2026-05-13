@@ -60,7 +60,11 @@ type findByCommitsCall struct {
 	commits    []string
 }
 
-func (m *mockSlipFinder) FindByCommits(_ context.Context, repository string, commits []string) (*domain.Slip, string, error) {
+func (m *mockSlipFinder) FindByCommits(
+	_ context.Context,
+	repository string,
+	commits []string,
+) (*domain.Slip, string, error) {
 	m.findByCommitsCalls = append(m.findByCommitsCalls, findByCommitsCall{
 		repository: repository,
 		commits:    commits,
