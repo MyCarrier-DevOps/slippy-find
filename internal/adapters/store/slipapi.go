@@ -4,7 +4,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -32,7 +31,7 @@ func NewSlipAPIAdapter(serverURL, apiKey string) (*SlipAPIAdapter, error) {
 		slippyclient.WithCustomHTTPClient(&http.Client{Timeout: httpClientTimeout}),
 		// Discard the wrapper's per-request slog output; this binary's stderr contract is
 		// "warnings/errors only" via the zap logger wired in main.
-		slippyclient.WithLogger(slog.New(slog.NewTextHandler(io.Discard, nil))),
+		slippyclient.WithLogger(slog.New(slog.DiscardHandler)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("slippy-api client: %w", err)
