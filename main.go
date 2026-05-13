@@ -4,7 +4,9 @@
 package main
 
 import (
+	"context"
 	"os"
+	"strings"
 
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/logger"
 
@@ -28,6 +30,19 @@ func main() {
 		},
 
 		ConfigLoader: func() (*cmd.AppConfig, error) {
+			// Defense-in-depth: a SLIPPY_API_URL that is set but contains
+			// only whitespace silently falls through to K8S_NAMESPACE
+			// resolution (slippyapi trims). Surface that as a WARN so
+			// an operator-set blank value — or a templating bug emitting
+			// a blank-but-present value — shows up rather than as silent
+			// namespace-derived routing.
+			if raw := os.Getenv("SLIPPY_API_URL"); raw != "" && strings.TrimSpace(raw) == "" {
+				adapter.Warn(
+					context.Background(),
+					"SLIPPY_API_URL is set but contains only whitespace; falling through to K8S_NAMESPACE-based resolution",
+					map[string]any{"k8s_namespace": os.Getenv("K8S_NAMESPACE")},
+				)
+			}
 			cfg, err := config.Load()
 			if err != nil {
 				return nil, err
