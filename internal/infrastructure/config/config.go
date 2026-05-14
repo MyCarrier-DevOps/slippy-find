@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+
+	slippyapi "github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi"
 )
 
 // Environment variable names.
 const (
 	EnvSlippyAPIURL = "SLIPPY_API_URL"
 	EnvSlippyAPIKey = "SLIPPY_API_KEY"
+	EnvK8sNamespace = "K8S_NAMESPACE"
 	EnvLogLevel     = "LOG_LEVEL"
 	EnvLogAppName   = "LOG_APP_NAME"
 )
@@ -24,7 +27,9 @@ const (
 
 // Configuration errors.
 var (
-	ErrSlippyAPIURLRequired = errors.New("SLIPPY_API_URL is required")
+	ErrSlippyAPIURLRequired = errors.New(
+		"SLIPPY_API_URL is required (set explicitly, or set K8S_NAMESPACE to a known slippy-api cluster: argo-events / argo-events-test)",
+	)
 	ErrSlippyAPIKeyRequired = errors.New("SLIPPY_API_KEY is required")
 )
 
@@ -44,12 +49,25 @@ type Config struct {
 }
 
 // Load loads the application configuration from environment variables.
+//
+// SLIPPY_API_URL resolution is delegated to
+// goLibMyCarrier/slippyapi.ResolveAPIURL: explicit SLIPPY_API_URL wins,
+// otherwise K8S_NAMESPACE maps to a known cluster, and an unknown
+// namespace returns an error. See that package for the full contract.
 func Load() (*Config, error) {
-	apiURL := os.Getenv(EnvSlippyAPIURL)
+	apiURL, err := slippyapi.ResolveAPIURL()
+	if err != nil {
+		// ErrNotConfigured (no env vars set) drops to the existing
+		// ErrSlippyAPIURLRequired path; other errors (unknown
+		// namespace, malformed override) propagate as fail-fast.
+		if !errors.Is(err, slippyapi.ErrNotConfigured) {
+			return nil, err
+		}
+	}
 	if apiURL == "" {
 		return nil, fmt.Errorf("%w", ErrSlippyAPIURLRequired)
 	}
-	if u, err := url.Parse(apiURL); err != nil || u.Scheme == "" || u.Host == "" {
+	if u, parseErr := url.Parse(apiURL); parseErr != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%s must be a valid http(s):// URL, got %q", EnvSlippyAPIURL, apiURL)
 	}
 
