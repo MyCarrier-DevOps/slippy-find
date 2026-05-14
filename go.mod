@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.65
-	github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.80-feat-slippy-resolve-api-url.3
+	github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.81
 	github.com/MyCarrier-DevOps/slippy-api/slippy-client v1.4.3
 	github.com/go-git/go-git/v5 v5.17.1
 	github.com/spf13/cobra v1.8.1

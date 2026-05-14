@@ -5,8 +5,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.65 h1:PekD21ELSjmp9PNsEraN7p4MeNEZBZYqLejzhN8wLVM=
 github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.65/go.mod h1:FPT/Yg8P3om32qbL4MGdqIPQAFbJ0YvT3TgGUtmiHwc=
-github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.80-feat-slippy-resolve-api-url.3 h1:sI54g6HyGoUh4apo8sQDJ6gXd8wXguR8oO+VjVdpp8I=
-github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.80-feat-slippy-resolve-api-url.3/go.mod h1:cixYi+U2u9mAeKQXMO579fxUz3YjfSY2Fe0r54pokAs=
+github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.81 h1:Yeut+FsAyNqYwcC4hng3TulDoYI7FtMWoNyP55klP+Y=
+github.com/MyCarrier-DevOps/goLibMyCarrier/slippyapi v1.3.81/go.mod h1:cixYi+U2u9mAeKQXMO579fxUz3YjfSY2Fe0r54pokAs=
 github.com/MyCarrier-DevOps/slippy-api/slippy-client v1.4.3 h1:4V8z1R2tVKfqnnDVd4KmFZJB3VNGyEWwBdh7YY6t6cI=
 github.com/MyCarrier-DevOps/slippy-api/slippy-client v1.4.3/go.mod h1:wm4EKbXMScG6BWfaVIjUUusjhArtavsslDi3pWFxR9Y=
 github.com/ProtonMail/go-crypto v1.3.0 h1:ILq8+Sf5If5DCpHQp4PbZdS1J7HDFRXz/+xKBiRGFrw=

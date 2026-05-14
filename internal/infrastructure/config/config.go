@@ -57,7 +57,12 @@ type Config struct {
 func Load() (*Config, error) {
 	apiURL, err := slippyapi.ResolveAPIURL()
 	if err != nil {
-		return nil, err
+		// ErrNotConfigured (no env vars set) drops to the existing
+		// ErrSlippyAPIURLRequired path; other errors (unknown
+		// namespace, malformed override) propagate as fail-fast.
+		if !errors.Is(err, slippyapi.ErrNotConfigured) {
+			return nil, err
+		}
 	}
 	if apiURL == "" {
 		return nil, fmt.Errorf("%w", ErrSlippyAPIURLRequired)
