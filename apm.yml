@@ -1,0 +1,10 @@
+name: slippy-find
+version: 1.0.0
+description: APM project for slippy-find
+author: MyCarrier-DevOps
+dependencies:
+  apm:
+  - MyCarrier-DevOps/apm_marketplace/packages/go-devkit
+  mcp: []
+includes: auto
+scripts: {}

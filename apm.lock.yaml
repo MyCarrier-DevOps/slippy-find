@@ -1,0 +1,25 @@
+lockfile_version: '1'
+generated_at: '2026-09-01T07:40:24.827534+00:00'
+apm_version: 0.19.0
+dependencies:
+- repo_url: MyCarrier-DevOps/apm_marketplace
+  host: github.com
+  resolved_commit: 5c3c076314b5a47c22c39735c3b1f87848684710
+  virtual_path: packages/go-devkit
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .claude/skills/go-preflight
+  - .claude/skills/go-preflight/SKILL.md
+  - .claude/skills/go-repo-init
+  - .claude/skills/go-repo-init/SKILL.md
+  - .claude/skills/go-tdd
+  - .claude/skills/go-tdd/SKILL.md
+  - .claude/skills/go-verify
+  - .claude/skills/go-verify/SKILL.md
+  deployed_file_hashes:
+    .claude/skills/go-preflight/SKILL.md: sha256:1c94c436cff9bf93b489f1475b7863d7d220348f679aea529dcbaa70417706ab
+    .claude/skills/go-repo-init/SKILL.md: sha256:b0cd2ffd1494f676300378885fccddb39521765251bc31ab48870ef07a9453c3
+    .claude/skills/go-tdd/SKILL.md: sha256:2894665c142ffab089aeeb232fdda5e99df7d0201b0b967dc799e0841ceae41c
+    .claude/skills/go-verify/SKILL.md: sha256:194d441e6ac9f0ac30ff311291f688bd4802c1efd5352e44b7a34cb8ee98ca1e
+  content_hash: sha256:8312d4534eb58d1c2eccbee3abc55216ab23ea8636dbf4bbf2aa4d20611776aa
