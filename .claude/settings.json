@@ -1,29 +1,4 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup|clear|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-start.sh"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre-commit-gate.sh",
-            "timeout": 1200
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "Bash(go build:*)",
@@ -37,13 +12,15 @@
       "Bash(go tool cover:*)",
       "Bash(make build)",
       "Bash(make test)",
-      "Bash(make test-all)",
-      "Bash(make e2e)",
       "Bash(make lint)",
       "Bash(make fmt)",
       "Bash(make tidy)",
       "Bash(make coverage-check)",
       "Bash(make mutation)",
+      "Bash(make mutation-all)",
+      "Bash(make ci)",
+      "Bash(make clean)",
+      "Bash(make check-sec)",
       "Bash(gofmt:*)",
       "Bash(goimports:*)",
       "Bash(golines:*)",
@@ -60,8 +37,13 @@
       "Read(**/*.pem)",
       "Read(**/*.key)",
       "Read(**/secrets/**)",
+      "Read(**/.envrc)",
       "Bash(go run:*)",
       "Bash(go generate:*)",
+      "Bash(go test * -exec*)",
+      "Bash(go test -exec*)",
+      "Bash(go build * -toolexec*)",
+      "Bash(go build -toolexec*)",
       "Bash(cd /*)",
       "Bash(cd ~*)",
       "Bash(cd ..)",
@@ -80,9 +62,7 @@
       "Bash(go install:*)",
       "Bash(go get:*)",
       "Bash(make run:*)",
-      "Bash(make bump)",
-      "Bash(make install-tools)",
-      "Bash(make check-sec)"
+      "Bash(make install-tools)"
     ]
   }
 }

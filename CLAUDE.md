@@ -40,6 +40,10 @@ intentionally floats on the patch level (`go-version: "1.26"`); bump it by hand
 for a new minor or major.
 <!-- END go-devkit -->
 
+*Project note: this repo pins `go 1.26` (minor level) in go.mod and CI — the
+full-patch prescription above assumes a Dockerfile pairing this repo doesn't
+have; upstream doc fix tracked.*
+
 ## Module layout
 
 Single Go module at the **repository root** (`./go.mod`, module
@@ -61,30 +65,35 @@ Makefile's `APPLICATION` is therefore `.`.
 ## Commands
 
 **Always use Makefile targets, NOT raw `go` / `golangci-lint` commands.** The
-Makefile encodes the canonical lint config, coverage thresholds, race flags,
-and tool versions used by CI. Raw `go test ./...` may pass while `make test`
-(and CI) fail because flags differ. `make help` lists everything; the ones
-that matter day to day:
+Makefile encodes the canonical lint config, tool versions, and the coverage
+threshold (`coverage-check`, 80%) used by CI, and now also gates the vuln
+scan (`check-sec`). Raw `go test ./...` may pass while `make test` (and CI)
+fail because flags differ. CI's authoritative gates live in `ci.yml`: the
+`test` job's 80% coverage-action gate and the `vuln` job, which now invoke
+`make install-tools`/`make check-sec` so the tool-version source of truth is
+the Makefile, not a duplicated inline install. `make help` lists everything;
+the ones that matter day to day:
 
 ```bash
 make test            # unit tests with race + coverage
+make coverage-check  # test, then assert total coverage >= 80%
 make lint            # golangci-lint, config at .github/.golangci.yml
 make fmt             # gofmt-equivalent formatters via golangci-lint
 make tidy            # go mod tidy
 make check-sec       # govulncheck
 make mutation        # mutest against origin/main
 make mutation-all    # mutest across the whole module (weekly CI audit)
-make ci              # fmt + lint + test + build
+make ci              # lint + coverage-check + build + check-sec
+make clean           # remove build artifacts
+make help            # list all targets
 make run ARGS="--depth 50"
 make build           # build binary
-make clean           # remove build artifacts
 ```
 
-Discover targets: `grep -E "^[a-z_-]+:" makefile`.
+Discover targets: `grep -E "^[a-z_-]+:" Makefile`.
 
 **Quick iteration:** `go build ./...` + `go vet ./...` acceptable. **Final
-gate before commit MUST be `make lint && make test`** — CI compares against
-Makefile output.
+gate before commit MUST be `make ci`** — CI compares against Makefile output.
 
 ## Coverage policy
 

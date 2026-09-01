@@ -11,8 +11,10 @@ GOLANGCI_LINT_VERSION := v2.13.2
 GOVULNCHECK_VERSION   := v1.7.0
 MUTEST_VERSION        := v0.6.0
 
-MUTATION_BASE      ?= origin/main
-MUTATION_THRESHOLD ?= 100
+MUTATION_BASE          ?= origin/main
+MUTATION_THRESHOLD     ?= 100
+MUTATION_ALL_THRESHOLD ?= 80
+COVERAGE_THRESHOLD     ?= 80
 
 .PHONY: lint
 lint: install-tools
@@ -64,7 +66,15 @@ build:
 
 .PHONY: install-tools
 install-tools:
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
+
+.PHONY: coverage-check
+coverage-check:
+	@echo "Checking total coverage >= $(COVERAGE_THRESHOLD)%..."
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	@total=$$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$$3); print $$3}'); \
+	echo "total coverage: $$total%"; \
+	awk -v t="$$total" -v th="$(COVERAGE_THRESHOLD)" 'BEGIN { exit (t+0 >= th+0) ? 0 : 1 }' || { echo "FAIL: coverage $$total% < $(COVERAGE_THRESHOLD)%"; exit 1; }
 
 .PHONY: mutation
 mutation:
@@ -72,17 +82,17 @@ mutation:
 	@for dir in $(APPLICATION); do \
 		if [ -d "$$dir" ]; then \
 			echo "Mutation testing $$dir module..."; \
-			(cd $$dir && { command -v mutest >/dev/null 2>&1 || go install github.com/fchimpan/mutest@$(MUTEST_VERSION); } && mutest -diff $(MUTATION_BASE) -threshold $(MUTATION_THRESHOLD) ./...) || exit 1; \
+			(cd $$dir && go install github.com/fchimpan/mutest@$(MUTEST_VERSION) && $$(go env GOPATH)/bin/mutest -diff $(MUTATION_BASE) -threshold $(MUTATION_THRESHOLD) ./...) || exit 1; \
 		fi; \
 	done
 
 .PHONY: mutation-all
 mutation-all:
-	@echo "Mutation testing all modules (threshold $(MUTATION_THRESHOLD)%)..."
+	@echo "Mutation testing all modules (threshold $(MUTATION_ALL_THRESHOLD)%)..."
 	@for dir in $(APPLICATION); do \
 		if [ -d "$$dir" ]; then \
 			echo "Mutation testing $$dir module..."; \
-			(cd $$dir && go mod download && { command -v mutest >/dev/null 2>&1 || go install github.com/fchimpan/mutest@$(MUTEST_VERSION); } && mutest -threshold $(MUTATION_THRESHOLD) ./...) || exit 1; \
+			(cd $$dir && go mod download && go install github.com/fchimpan/mutest@$(MUTEST_VERSION) && $$(go env GOPATH)/bin/mutest -threshold $(MUTATION_ALL_THRESHOLD) ./...) || exit 1; \
 		fi; \
 	done
 
@@ -91,7 +101,7 @@ run:
 	go run . $(ARGS)
 
 .PHONY: ci
-ci: fmt lint test build
+ci: lint coverage-check build check-sec
 
 .PHONY: help
 help:
@@ -99,8 +109,9 @@ help:
 	@echo "  make build          - build ./$(BINARY)"
 	@echo "  make run ARGS=...   - run the CLI from source"
 	@echo "  make test           - unit tests with race + coverage"
+	@echo "  make coverage-check - test + assert total coverage >= $(COVERAGE_THRESHOLD)%"
 	@echo "  make mutation       - mutation-test code changed vs $(MUTATION_BASE) (mutest, $(MUTATION_THRESHOLD)% kill)"
-	@echo "  make mutation-all   - mutation-test the whole module (weekly CI audit)"
+	@echo "  make mutation-all   - mutation-test the whole module (weekly CI audit, $(MUTATION_ALL_THRESHOLD)% kill)"
 	@echo "  make lint           - run golangci-lint"
 	@echo "  make fmt            - format code via golangci-lint"
 	@echo "  make check-sec      - run govulncheck"
@@ -108,4 +119,4 @@ help:
 	@echo "  make bump           - upgrade dependencies"
 	@echo "  make clean          - clean build & test caches"
 	@echo "  make install-tools  - install golangci-lint $(GOLANGCI_LINT_VERSION) locally"
-	@echo "  make ci             - fmt + lint + test + build"
+	@echo "  make ci             - lint + coverage-check + build + check-sec"

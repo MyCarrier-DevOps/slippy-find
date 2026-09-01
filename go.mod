@@ -1,6 +1,6 @@
 module github.com/MyCarrier-DevOps/slippy-find
 
-go 1.26.7
+go 1.26
 
 require (
 	github.com/MyCarrier-DevOps/goLibMyCarrier/logger v1.3.65

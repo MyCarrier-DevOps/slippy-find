@@ -8,9 +8,12 @@
   `apm.lock.yaml`, `.claude/skills/{go-preflight,go-repo-init,go-tdd,go-verify}`,
   merged `.claude/settings.json` permissions).
 - `CLAUDE.md`: added the go-devkit ownership preamble and workflow block
-  (RED-test-first, preflight, verify, pre-commit gate), folded in the
-  still-relevant content of `.github/instructions/go.instructions.md`
-  (now retired), and kept this repo's existing 80% coverage gate.
+  (RED-test-first, preflight, verify, pre-commit gate). The idiomatic-Go
+  conventions previously in `.github/instructions/go.instructions.md` were
+  **delegated** to the go-devkit plugin (out-of-tree, installed under
+  `apm_modules/`) rather than folded in wholesale; only this repo's
+  house rules and the existing 80% coverage gate were retained in
+  `CLAUDE.md` directly.
 - `Makefile`: added tool-version vars (`GOLANGCI_LINT_VERSION`,
   `GOVULNCHECK_VERSION`, `MUTEST_VERSION`), `APPLICATION`, `MUTATION_BASE` /
   `MUTATION_THRESHOLD`, and the `mutation`, `mutation-all`, `run`, `help`,
@@ -21,6 +24,32 @@
   (Mondays 06:00 UTC).
 - Moved this file's history out of `.github/PROJECT_STATE.md`, which is
   retired below.
+
+### PR #15 review follow-up
+
+- CI hardening: `actions/checkout`/`actions/setup-go` SHA-pinned across
+  `ci.yml` and `mutation.yml`; `persist-credentials: false` on the
+  non-release checkouts; lint/vuln jobs now install tools via
+  `make install-tools`/`make check-sec` instead of duplicating install
+  logic inline; `GO_VERSION` moved to the minor-level pin `1.26`.
+- `.claude/settings.json`: removed the broken `hooks` block (the plugin
+  ships the `SessionStart` hook globally — see `go-repo-init`'s
+  `SKILL.md`); reconciled the allow/deny lists (`make bump`/`make
+  check-sec` unblocked, `-exec`/`-toolexec` and `.envrc` hardening added).
+- `Makefile` (renamed from `makefile` for case-sensitive-FS/CI
+  compatibility): `golangci-lint` installer pinned to a release tag ref
+  instead of `go install @latest`-style floating; `mutest` install
+  unconditional with an explicit binary path; new `MUTATION_ALL_THRESHOLD`
+  (80%, ratcheted from the measured kill rate) for `mutation-all`; new
+  `coverage-check` target; `ci` target now runs `lint coverage-check build
+  check-sec` (no in-place mutation of tracked files).
+- Go version doctrine: minor-level pin (`go 1.26`) in `go.mod` and CI,
+  documented as a per-repo deviation from the go-devkit plugin's
+  full-patch-pin default (that default assumes a paired Dockerfile this
+  repo doesn't have).
+- Release job now writes generated release notes to an untracked
+  `release_notes.md` instead of overwriting this file — `CHANGELOG.md`
+  stays durable history, never CI-written.
 
 ## Project history (imported from .github/PROJECT_STATE.md, last updated 2026-05-13)
 
