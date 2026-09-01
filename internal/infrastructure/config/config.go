@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 )
 
 // Environment variable names.
 const (
-	EnvSlippyAPIURL = "SLIPPY_API_URL"
-	EnvSlippyAPIKey = "SLIPPY_API_KEY"
-	EnvLogLevel     = "LOG_LEVEL"
-	EnvLogAppName   = "LOG_APP_NAME"
+	EnvSlippyAPIURL      = "SLIPPY_API_URL"
+	EnvSlippyAPIKey      = "SLIPPY_API_KEY"
+	EnvSlippyAPIIPv4Only = "SLIPPY_API_IPV4_ONLY"
+	EnvLogLevel          = "LOG_LEVEL"
+	EnvLogAppName        = "LOG_APP_NAME"
 )
 
 // Default values.
@@ -36,6 +38,10 @@ type Config struct {
 	// SlippyAPIKey is the Bearer token for authenticating read requests.
 	SlippyAPIKey string
 
+	// SlippyAPIIPv4Only forces slippy-api dials onto IPv4. Enable it on IPv4-only hosts
+	// such as GitHub-hosted runners, where the AAAA leg of a dual-stack dial can only fail.
+	SlippyAPIIPv4Only bool
+
 	// LogLevel is the logging level (debug, info, error).
 	LogLevel string
 
@@ -49,13 +55,22 @@ func Load() (*Config, error) {
 	if apiURL == "" {
 		return nil, fmt.Errorf("%w", ErrSlippyAPIURLRequired)
 	}
-	if u, err := url.Parse(apiURL); err != nil || u.Scheme == "" || u.Host == "" {
+	// Enforce what the message already claims. A scheme this check let through — "htp://"
+	// — reaches the HTTP client, which reports "unsupported protocol scheme" as an
+	// ordinary request error indistinguishable from a transient one.
+	if u, err := url.Parse(apiURL); err != nil || u.Host == "" ||
+		(u.Scheme != "http" && u.Scheme != "https") {
 		return nil, fmt.Errorf("%s must be a valid http(s):// URL, got %q", EnvSlippyAPIURL, apiURL)
 	}
 
 	apiKey := os.Getenv(EnvSlippyAPIKey)
 	if apiKey == "" {
 		return nil, fmt.Errorf("%w", ErrSlippyAPIKeyRequired)
+	}
+
+	ipv4Only, err := loadBool(EnvSlippyAPIIPv4Only)
+	if err != nil {
+		return nil, err
 	}
 
 	logLevel := os.Getenv(EnvLogLevel)
@@ -69,9 +84,26 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		SlippyAPIURL: apiURL,
-		SlippyAPIKey: apiKey,
-		LogLevel:     logLevel,
-		LogAppName:   logAppName,
+		SlippyAPIURL:      apiURL,
+		SlippyAPIKey:      apiKey,
+		SlippyAPIIPv4Only: ipv4Only,
+		LogLevel:          logLevel,
+		LogAppName:        logAppName,
 	}, nil
+}
+
+// loadBool reads an optional boolean environment variable. An unset or empty value is
+// false; anything strconv.ParseBool rejects is a configuration error rather than a silent
+// false, so a typo like SLIPPY_API_IPV4_ONLY=yes is reported instead of ignored.
+func loadBool(name string) (bool, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return false, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean (true/false), got %q", name, raw)
+	}
+	return value, nil
 }

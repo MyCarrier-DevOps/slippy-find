@@ -113,8 +113,39 @@ All configuration is supplied via environment variables. There is no Vault depen
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `SLIPPY_API_IPV4_ONLY` | Force slippy-api dials onto IPv4 (`true`/`false`) | `false` |
 | `LOG_LEVEL` | Log level (`debug`, `info`, `error`) | `info` |
 | `LOG_APP_NAME` | Application name for log context | `slippy-find` |
+
+### Network Resilience
+
+slippy-find resolves the correlation ID that every downstream step of a routing slip keys on, so a single unreachable-host blip used to fail a whole production release. Calls to slippy-api are therefore retried — but only where a retry can actually help.
+
+- **Retried:** faults where the request never reached a server that then did work on it (connection refused, `network is unreachable`, DNS SERVFAIL), `5xx`, a body truncated mid-read, and a `429` from an intermediary.
+- **Not retried:** `200`, `404` (no slip in ancestry), `401`/`403`, any other `4xx`, a body this client cannot decode, an NXDOMAIN host, a certificate that fails verification, and a context the caller cancelled.
+- **A deadline is never retried, at any layer.** On a ClickHouse miss, slippy-api's `find-by-commits` falls back to a serial per-commit GitHub GraphQL ancestry walk, and it abandons that walk on client disconnect — restarting from `commits[0]` next time. So a retried timeout redoes the identical work, fails at the identical point, and burns the shared GitHub GraphQL quota once per attempt. One generous attempt beats four truncated ones.
+- **`429` depends on who sent it.** slippy-api's own `429` is an authentication-failure lockout whose Fibonacci ladder is *extended* by every request that arrives while locked, so it is terminal; it is identified by the `X-RateLimit-Limit` header it always carries. A `429` without that header came from an intermediary — Cloudflare fronts this API — and is an ordinary throttle, so it is retried honouring `Retry-After`.
+- **Backoff:** 4 attempts total (3 retries) with equal jitter — each wait is uniformly random in `[d/2, d)` where `d` doubles from 500ms and is capped at 5s, so the waits run roughly 250-500ms, 500ms-1s, then 1-2s.
+- **`Retry-After` is a floor, never a ceiling.** It is honoured in full and jittered *upward*, never trimmed to fit the backoff cap — arriving early is what a rate limiter penalises. The retry budget below is what bounds the wait.
+- Each retry is logged at warn level to **stderr**, so a slippy-api that is degrading but still succeeding is visible in workflow logs without contaminating the correlation ID on stdout.
+
+**Latency.** Two bounds, sized independently:
+
+| Bound | Value | Why |
+|---|---|---|
+| Per attempt | 45s | Sits inside slippy-api's own 60s `WriteTimeout`, which its source documents as leaving "ample room for a capped ancestry walk". A tighter client cap could not serve a legitimately slow walk on *any* attempt, since every attempt gets the same cap. |
+| Whole sequence | 50s | Hard ceiling on attempts plus backoff. |
+| One `DialContext` | 5s | Name resolution plus every address tried. This is what bounds the retryable failure class. |
+
+`attempts × 45s` is not reachable, because a deadline is terminal — the sequence can only run long by accumulating fast dial failures, which cost 5s each. Worst cases: four dial failures ≈ 22s; a persistent `5xx` ≈ 4s; one slow ancestry walk = 45s in a single attempt.
+
+`SLIPPY_API_IPV4_ONLY=true` narrows `tcp` dials to `tcp4`, skipping a wasted AAAA leg on a host with no IPv6 route.
+
+> **This is an optimisation, not a fix.** It is tempting to read `dial tcp [2606:...]:443: connect: network is unreachable` as "the AAAA leg failed and masked a working A leg", but Go's dialer does not work that way. `net/dial.go` races both families and returns the first success outright; the primary family's error surfaces *only* once the other leg has also finished and failed. So an `ENETUNREACH` reaching the caller means IPv4 was tried and failed too, and forcing `tcp4` would not have turned that failure into a success. The retry is what addresses a transient dial failure.
+
+Nothing in this org sets it, and the canonical GitHub Actions snippet above deliberately does not: the saving is one redundant DNS leg per invocation. It is retained for self-hosted IPv4-only runners. Leave it unset otherwise — on an IPv6-only host it makes every dial fail with `no suitable address found`.
+
+`SLIPPY_API_IPV4_ONLY` is parsed strictly: a value `strconv.ParseBool` rejects (`yes`, `no`, `on`, `off`) is a startup error rather than a silent default, so a typo is reported instead of leaving you believing the flag is on.
 
 ### Database Selection (Test vs. Prod)
 

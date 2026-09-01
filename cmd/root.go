@@ -61,6 +61,9 @@ type AppConfig struct {
 	// SlippyAPIKey is the Bearer token for authenticating slip read requests.
 	SlippyAPIKey string
 
+	// SlippyAPIIPv4Only forces slippy-api dials onto IPv4.
+	SlippyAPIIPv4Only bool
+
 	// LogLevel is the log level setting.
 	LogLevel string
 

@@ -10,7 +10,7 @@
 **Key Characteristics:**
 - Operates entirely on local Git repositories (no GitHub API calls)
 - Uses `go-git/go-git/v5` to walk commit ancestry from HEAD
-- Resolves slips by calling `POST /slips/find-by-commits` on **slippy-api** via the generated `slippy-api/slippy-client` (bearer-token auth, 30s timeout)
+- Resolves slips by calling `POST /slips/find-by-commits` on **slippy-api** via the generated `slippy-api/slippy-client` (bearer-token auth, 45s per attempt under a 50s retry budget)
 - Uses `goLibMyCarrier/logger` for structured logging to stderr
 - All git context (HEAD SHA, branch, repository name) derived from local repository
 - Repository name extracted from `origin` remote URL (HTTPS or SSH format)
@@ -45,7 +45,9 @@
 - Dropped `goLibMyCarrier/{clickhouse,slippy,vault}` from `go.mod`.
 - Simplified configuration: required `SLIPPY_API_URL` + `SLIPPY_API_KEY`. Dropped `CLICKHOUSE_*`, `VAULT_*`, `SLIPPY_PIPELINE_CONFIG`, `WEBHOOK_TARGET`, `SLIPPY_DATABASE`.
 - Database selection (`ci` vs `ci_test`) now lives in slippy-api: it derives the database from `K8S_NAMESPACE`. Workflow steps that previously routed reads to `ci_test` via `WEBHOOK_TARGET` must now set `SLIPPY_API_URL` to the slippy-api deployment in the `slippy-api-test` namespace.
-- Bounded HTTP client with `Timeout: 30s` so a misconfigured `SLIPPY_API_URL` fails fast.
+- Bounded HTTP client: 45s per attempt (inside slippy-api's 60s `WriteTimeout`), 5s per `DialContext`,
+  and a 50s ceiling on the whole retry sequence. A misconfigured `SLIPPY_API_URL` still fails fast —
+  it is rejected at config load, and DNS/TLS/deadline faults are classified non-retryable.
 - Silenced the wrapper client's default `slog` logger so stderr stays "warnings/errors only" per the README contract.
 - `SLIPPY_API_URL` is validated with `url.Parse` at the config boundary (scheme + host required) so typos surface immediately rather than as opaque relative-URL errors inside the generated client.
 - Non-200/404 responses now surface the RFC 7807 `detail`/`title` from the API; 401/403 produce an explicit "authentication failed — check `SLIPPY_API_KEY`" hint.
@@ -83,7 +85,8 @@
 - **Rationale:** Phase 1c of the sole-authority migration. slippy-find should never own a direct database connection; all reads go through slippy-api so a single service owns slip storage semantics (including the `ci` vs `ci_test` database split, derived from slippy-api's own `K8S_NAMESPACE`).
 - **Implementation:**
   - `internal/adapters/store/slipapi.go` wraps `slippyclient.WrappedClient`.
-  - 30s HTTP timeout, bearer auth, RFC 7807 problem-detail extraction on errors.
+  - 45s per-attempt HTTP timeout under a 50s retry budget, bearer auth, refused redirects,
+    RFC 7807 problem-detail extraction on errors.
   - URL validated with `url.Parse` at the config boundary.
 - **Trade-offs:** Requires network reachability to slippy-api; adds a hop versus direct ClickHouse access.
 

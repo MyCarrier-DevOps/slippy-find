@@ -28,18 +28,31 @@ type slipObj struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-func newTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *SlipAPIAdapter) {
+// newTestServer builds an adapter pointed at a throwaway server. Retry backoff is replaced
+// with an instant recorder so tests that exercise the retry path stay fast; the recorded
+// delays are what the adapter *would* have waited.
+func newTestServer(
+	t *testing.T,
+	handler http.HandlerFunc,
+	opts ...Option,
+) (*httptest.Server, *SlipAPIAdapter, *[]time.Duration) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	adapter, err := NewSlipAPIAdapter(srv.URL, "test-key")
+	adapter, err := NewSlipAPIAdapter(srv.URL, "test-key", opts...)
 	require.NoError(t, err)
-	return srv, adapter
+
+	delays := &[]time.Duration{}
+	adapter.sleep = func(_ context.Context, d time.Duration) error {
+		*delays = append(*delays, d)
+		return nil
+	}
+	return srv, adapter, delays
 }
 
 func TestSlipAPIAdapter_FindByCommits_Success(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/slips/find-by-commits", r.URL.Path)
 		assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
@@ -69,7 +82,7 @@ func TestSlipAPIAdapter_FindByCommits_Success(t *testing.T) {
 }
 
 func TestSlipAPIAdapter_FindByCommits_Unauthorized_SurfacesAuthHint(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{
@@ -85,7 +98,7 @@ func TestSlipAPIAdapter_FindByCommits_Unauthorized_SurfacesAuthHint(t *testing.T
 }
 
 func TestSlipAPIAdapter_FindByCommits_NotFound(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	})
 
@@ -97,7 +110,7 @@ func TestSlipAPIAdapter_FindByCommits_NotFound(t *testing.T) {
 }
 
 func TestSlipAPIAdapter_FindByCommits_ServerError(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
@@ -110,7 +123,7 @@ func TestSlipAPIAdapter_FindByCommits_ServerError(t *testing.T) {
 }
 
 func TestSlipAPIAdapter_FindByCommits_EmptyBody(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		// Return 200 with empty body — should be treated as an error.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -121,7 +134,7 @@ func TestSlipAPIAdapter_FindByCommits_EmptyBody(t *testing.T) {
 }
 
 func TestSlipAPIAdapter_Close(t *testing.T) {
-	_, adapter := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
+	_, adapter, _ := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	assert.NoError(t, adapter.Close())

@@ -4,7 +4,9 @@
 package main
 
 import (
+	"context"
 	"os"
+	"time"
 
 	"github.com/MyCarrier-DevOps/goLibMyCarrier/logger"
 
@@ -33,10 +35,11 @@ func main() {
 				return nil, err
 			}
 			return &cmd.AppConfig{
-				SlippyAPIURL: cfg.SlippyAPIURL,
-				SlippyAPIKey: cfg.SlippyAPIKey,
-				LogLevel:     cfg.LogLevel,
-				LogAppName:   cfg.LogAppName,
+				SlippyAPIURL:      cfg.SlippyAPIURL,
+				SlippyAPIKey:      cfg.SlippyAPIKey,
+				SlippyAPIIPv4Only: cfg.SlippyAPIIPv4Only,
+				LogLevel:          cfg.LogLevel,
+				LogAppName:        cfg.LogAppName,
 			}, nil
 		},
 
@@ -45,7 +48,18 @@ func main() {
 		},
 
 		SlipFinderFactory: func(cfg *cmd.AppConfig, _ cmd.Logger) (domain.SlipFinder, error) {
-			return store.NewSlipAPIAdapter(cfg.SlippyAPIURL, cfg.SlippyAPIKey)
+			return store.NewSlipAPIAdapter(cfg.SlippyAPIURL, cfg.SlippyAPIKey,
+				store.WithIPv4Only(cfg.SlippyAPIIPv4Only),
+				store.WithRetryNotifier(func(
+					ctx context.Context, attempt int, delay time.Duration, err error,
+				) {
+					adapter.Warn(ctx, "slippy-api call failed, retrying", map[string]interface{}{
+						"attempt":  attempt,
+						"retry_in": delay.String(),
+						"error":    err.Error(),
+					})
+				}),
+			)
 		},
 
 		ResolverFactory: func(
