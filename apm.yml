@@ -1,0 +1,14 @@
+name: slippy-find
+# version has no bearing on apm's own semantics for a leaf project (not
+# published), but the field is required by the manifest schema — 0.1.0
+# reflects that this is a repo-local project manifest, not a released
+# package, and 1.0.0 overstated stability.
+version: 0.1.0
+description: APM project for slippy-find
+author: MyCarrier-DevOps
+dependencies:
+  apm:
+  - MyCarrier-DevOps/apm_marketplace/packages/go-devkit#go-devkit-v0.2.1
+  mcp: []
+includes: auto
+scripts: {}

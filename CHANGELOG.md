@@ -1,9 +1,61 @@
-# Project State — slippy-find Application
+# Changelog
 
-> **Last Updated:** 2026-05-13
-> **Status:** Production ready; cut over to slippy-api HTTP client (sole-authority Phase 1c)
+## [Unreleased]
 
-## Overview
+### go-devkit onboarding
+
+- Onboarded the repo into the **go-devkit** apm plugin workflow (`apm.yml`,
+  `apm.lock.yaml`, `.claude/skills/{go-preflight,go-repo-init,go-tdd,go-verify}`,
+  merged `.claude/settings.json` permissions).
+- `CLAUDE.md`: added the go-devkit ownership preamble and workflow block
+  (RED-test-first, preflight, verify, pre-commit gate). The idiomatic-Go
+  conventions previously in `.github/instructions/go.instructions.md` were
+  **delegated** to the go-devkit plugin (out-of-tree, installed under
+  `apm_modules/`) rather than folded in wholesale; only this repo's
+  house rules and the existing 80% coverage gate were retained in
+  `CLAUDE.md` directly.
+- `Makefile`: added tool-version vars (`GOLANGCI_LINT_VERSION`,
+  `GOVULNCHECK_VERSION`, `MUTEST_VERSION`), `APPLICATION`, `MUTATION_BASE` /
+  `MUTATION_THRESHOLD`, and the `mutation`, `mutation-all`, `run`, `help`,
+  `ci` targets.
+- `.github/workflows/ci.yml`: top-level `permissions: contents: read`,
+  `actions/checkout`/`actions/setup-go` bumped to v7.
+- `.github/workflows/mutation.yml`: new weekly full-codebase mutation audit
+  (Mondays 06:00 UTC).
+- Moved this file's history out of `.github/PROJECT_STATE.md`, which is
+  retired below.
+
+### PR #15 review follow-up
+
+- CI hardening: `actions/checkout`/`actions/setup-go` SHA-pinned across
+  `ci.yml` and `mutation.yml`; `persist-credentials: false` on the
+  non-release checkouts; lint/vuln jobs now install tools via
+  `make install-tools`/`make check-sec` instead of duplicating install
+  logic inline; `GO_VERSION` moved to the minor-level pin `1.26`.
+- `.claude/settings.json`: removed the broken `hooks` block (the plugin
+  ships the `SessionStart` hook globally — see `go-repo-init`'s
+  `SKILL.md`); reconciled the allow/deny lists (`make bump`/`make
+  check-sec` unblocked, `-exec`/`-toolexec` and `.envrc` hardening added).
+- `Makefile` (renamed from `makefile` for case-sensitive-FS/CI
+  compatibility): `golangci-lint` installer pinned to a release tag ref
+  instead of `go install @latest`-style floating; `mutest` install
+  unconditional with an explicit binary path; new `MUTATION_ALL_THRESHOLD`
+  (80%, ratcheted from the measured kill rate) for `mutation-all`; new
+  `coverage-check` target; `ci` target now runs `lint coverage-check build
+  check-sec` (no in-place mutation of tracked files).
+- Go version doctrine: minor-level pin (`go 1.26`) in `go.mod` and CI,
+  documented as a per-repo deviation from the go-devkit plugin's
+  full-patch-pin default (that default assumes a paired Dockerfile this
+  repo doesn't have).
+- Release job now writes generated release notes to an untracked
+  `release_notes.md` instead of overwriting this file — `CHANGELOG.md`
+  stays durable history, never CI-written.
+
+## Project history (imported from .github/PROJECT_STATE.md, last updated 2026-05-13)
+
+> **Status (as of 2026-05-13):** Production ready; cut over to slippy-api HTTP client (sole-authority Phase 1c)
+
+### Overview
 
 **slippy-find** is a Go CLI application that resolves routing slips using local Git repository commit history. It outputs only the `correlation_id` to stdout for consumption by external systems.
 
@@ -16,9 +68,9 @@
 - Repository name extracted from `origin` remote URL (HTTPS or SSH format)
 - **Full dependency injection throughout** — all dependencies are injectable via interfaces
 
-## Implemented Systems
+### Implemented Systems
 
-### Completed
+#### Completed
 - Domain layer with interfaces (`internal/domain/interfaces.go`, `internal/domain/entities.go`)
 - Git adapter using go-git/v5 (`internal/adapters/git/gogit.go`)
 - Output writer (`internal/adapters/output/writer.go`)
@@ -28,7 +80,7 @@
 - CLI with proper DI (`cmd/root.go`)
 - Production dependency wiring (`main.go`)
 
-### Test Coverage
+#### Test Coverage
 | Package | Coverage |
 |---------|----------|
 | cmd | ~82% |
@@ -38,9 +90,9 @@
 | infrastructure/config | ~92% |
 | usecases | 100% |
 
-## Recent Changes
+### Recent Changes
 
-### 2026-05-13: Cut over to slippy-api HTTP client (sole-authority Phase 1c)
+#### 2026-05-13: Cut over to slippy-api HTTP client (sole-authority Phase 1c)
 - Replaced `ClickHouseAdapter` (direct `goLibMyCarrier/slippy` + ClickHouse connection) with `SlipAPIAdapter` that calls `POST /slips/find-by-commits` via `slippy-api/slippy-client v1.4.3`.
 - Dropped `goLibMyCarrier/{clickhouse,slippy,vault}` from `go.mod`.
 - Simplified configuration: required `SLIPPY_API_URL` + `SLIPPY_API_KEY`. Dropped `CLICKHOUSE_*`, `VAULT_*`, `SLIPPY_PIPELINE_CONFIG`, `WEBHOOK_TARGET`, `SLIPPY_DATABASE`.
@@ -53,34 +105,34 @@
 - Non-200/404 responses now surface the RFC 7807 `detail`/`title` from the API; 401/403 produce an explicit "authentication failed — check `SLIPPY_API_KEY`" hint.
 - Added tests: bearer header assertion, request body shape decode, 401 error-detail surfacing, invalid-URL rejection, and wiring of `AppConfig.SlippyAPIURL`/`SlippyAPIKey` through to `SlipFinderFactory`.
 
-### 2026-03-13: Fix Detached Merge Commit Ancestry Walk (CI PR Checkout)
+#### 2026-03-13: Fix Detached Merge Commit Ancestry Walk (CI PR Checkout)
 - **Root cause:** GitHub Actions `actions/checkout` creates a merge commit in detached HEAD state for PRs. Parent 0 is the base branch, parent 1 is the feature branch. The first-parent-only walk was following only the base branch, never reaching feature branch commits where the routing slip was created.
 - Modified `GetCommitAncestry` in `internal/adapters/git/gogit.go` to detect detached merge commits and walk **all** parent chains independently (each following first-parent).
 - Extracted `walkFirstParent` helper method for reusable first-parent chain walking.
 - Added integration test `TestGoGitRepository_GetCommitAncestry_DetachedMergeCommit` verifying both base and feature branch commits are found.
 
-### 2026-02-25: CI Tooling Version Alignment
+#### 2026-02-25: CI Tooling Version Alignment
 - Updated GitHub Actions workflow to use `GO_VERSION: '1.26'` and `golangci-lint v2.10.1`.
 
-## Architectural Decisions
+### Architectural Decisions
 
-### AD-001: Local Git Operations Replace GitHub API
+#### AD-001: Local Git Operations Replace GitHub API
 - **Decision:** Implement `LocalGitRepository` interface using `go-git/v5` instead of any GitHub API.
 - **Rationale:** Application operates on local repositories; GitHub API calls are unnecessary and would require network access.
 - **Trade-offs:** Cannot resolve slips for repositories not cloned locally; must have `origin` remote configured.
 
-### AD-002: No Repository Override Flag
+#### AD-002: No Repository Override Flag
 - **Decision:** Repository name is always derived from local Git `origin` remote; no `--repository` flag.
 - **Rationale:** Tool is designed exclusively for local repository analysis; overrides could lead to mismatched slip resolution.
 - **Trade-offs:** Requires valid `origin` remote; fails immediately if not configured.
 
-### AD-003: Detached HEAD Handling
+#### AD-003: Detached HEAD Handling
 - **Decision:** Warn to stderr and continue when HEAD is detached (not on a branch).
 - **Rationale:** Slip resolution can still work with commit SHA ancestry; branch name is informational.
 - **Enhancement (2026-03-13):** When HEAD is a detached **merge commit** (typical of CI PR checkout), walk all parent chains so both base and feature branch commits are searched.
 - **Trade-offs:** Branch-specific slip matching may be degraded; merge commit walks return more commits than depth (up to `1 + depth * num_parents`).
 
-### AD-004: slippy-api HTTP Client (replaces direct ClickHouse + Vault)
+#### AD-004: slippy-api HTTP Client (replaces direct ClickHouse + Vault)
 - **Decision:** Resolve slips by calling slippy-api over HTTP using the generated `slippy-api/slippy-client`. Authenticate with a bearer token; no Vault, no ClickHouse, no pipeline-config file.
 - **Rationale:** Phase 1c of the sole-authority migration. slippy-find should never own a direct database connection; all reads go through slippy-api so a single service owns slip storage semantics (including the `ci` vs `ci_test` database split, derived from slippy-api's own `K8S_NAMESPACE`).
 - **Implementation:**
@@ -90,7 +142,7 @@
   - URL validated with `url.Parse` at the config boundary.
 - **Trade-offs:** Requires network reachability to slippy-api; adds a hop versus direct ClickHouse access.
 
-### AD-005: Full Dependency Injection
+#### AD-005: Full Dependency Injection
 - **Decision:** All external dependencies injected via interfaces; no direct instantiation in business logic.
 - **Rationale:** Enables comprehensive unit testing via mocks; follows SOLID principles.
 - **Implementation:**
@@ -99,33 +151,33 @@
   - Domain interfaces defined for: `LocalGitRepository`, `SlipFinder`, `OutputWriter`, `Resolver`, `Logger`.
 - **Trade-offs:** Additional boilerplate for wiring; `main.go` contains production wiring logic.
 
-## Technical Debt / Known Issues
+### Technical Debt / Known Issues
 
 - `main.go` not included in coverage (expected for entry point files).
 - `Execute()` function calls `os.Exit()` making it difficult to test.
 
-## Environment Variables Reference
+### Environment Variables Reference
 
-### Required
+#### Required
 | Variable | Description |
 |----------|-------------|
 | `SLIPPY_API_URL` | Base URL of the slippy-api service (e.g. `http://slippy-api/v1`). Must include scheme and host. |
 | `SLIPPY_API_KEY` | Bearer token for authenticating slip read requests. |
 
-### Optional
+#### Optional
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LOG_LEVEL` | Logging level (`debug`, `info`, `error`) | `info` |
 | `LOG_APP_NAME` | Application name for logs | `slippy-find` |
 
-### Retired (no longer read — remove from workflow templates)
+#### Retired (no longer read — remove from workflow templates)
 - `CLICKHOUSE_HOSTNAME`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USERNAME`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_SKIP_VERIFY`
 - `VAULT_ADDRESS`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `VAULT_PIPELINE_CONFIG_PATH`, `VAULT_PIPELINE_CONFIG_MOUNT`
 - `SLIPPY_PIPELINE_CONFIG`
 - `SLIPPY_DATABASE`
 - `WEBHOOK_TARGET` (database selection moved to slippy-api; route reads to the test namespace's slippy-api instead)
 
-## CLI Usage
+### CLI Usage
 
 ```bash
 # Basic usage (current directory)

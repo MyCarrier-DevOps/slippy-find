@@ -7,6 +7,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
+      - 'Makefile'
       - '.github/workflows/ci.yml'
       - '.github/.golangci.yml'
     branches:
@@ -16,10 +17,14 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
+      - 'Makefile'
       - '.github/workflows/ci.yml'
       - '.github/.golangci.yml'
     branches:
       - main
+
+permissions:
+  contents: read
 
 env:
   GO_VERSION: '1.26'
@@ -33,9 +38,11 @@ jobs:
       actions: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -58,15 +65,16 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.10.1
+        run: make install-tools
 
       - name: Run linter
         run: |
@@ -77,17 +85,16 @@ jobs:
     name: Vulnerability Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
       - name: Run vulnerability scan
-        run: govulncheck -show verbose ./...
+        run: make check-sec
 
   release:
     name: Release
@@ -100,7 +107,7 @@ jobs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
       changelog: ${{ steps.tag_version.outputs.changelog }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -113,15 +120,15 @@ jobs:
           release_branches: main
           tag_prefix: v
 
-      - name: Create changelog
+      - name: Create release notes
         id: changelog
         if: steps.tag_version.outputs.new_tag
         run: |
-          echo "## What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "${{ steps.tag_version.outputs.changelog }}" >> CHANGELOG.md
+          echo "## What's Changed" > release_notes.md
+          echo "" >> release_notes.md
+          echo "${{ steps.tag_version.outputs.changelog }}" >> release_notes.md
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.tag_version.outputs.new_tag
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -149,7 +156,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: ${{ steps.tag_version.outputs.new_tag }}
-          body_path: CHANGELOG.md
+          body_path: release_notes.md
           files: |
             dist/slippy-find-linux-amd64
             dist/slippy-find-linux-arm64

@@ -1,8 +1,8 @@
 # slippy-find AI Development Instructions
 
-## CRITICAL: Read Project State First
+## CRITICAL: Read Project History First
 
-### At Session Start Before making ANY changes, read [.github/PROJECT_STATE.md](.github/PROJECT_STATE.md).
+### At Session Start Before making ANY changes, read [CHANGELOG.md](../CHANGELOG.md), "Project history" section.
 - Understand current state, recent changes, and pending work
 - Review any in-progress items or architectural decisions
 - Current implementation status and architecture
@@ -14,8 +14,10 @@
 
 ## Required Reading
 
-1. **[.github/PROJECT_STATE.md](.github/PROJECT_STATE.md)** - Project context, architecture, domain patterns
-2. **[.github/instructions/go.instructions.md](.github/instructions/go.instructions.md)** - Go coding standards
+1. **[CHANGELOG.md](../CHANGELOG.md)**, "Project history" section - Project context, architecture, domain patterns
+2. Go conventions are owned by the **go-devkit** plugin (see the go-devkit
+   block in [CLAUDE.md](../CLAUDE.md)) - naming, error handling, package
+   layout, concurrency, HTTP clients, testing, security
 
 ---
 
@@ -58,14 +60,14 @@ go build -o slippy ./cmd/slippy
 
 ## Project State Documentation
 
-**You MUST maintain `.github/PROJECT_STATE.md` as working memory for this project.**
+**You MUST maintain the "Project history" section of [CHANGELOG.md](../CHANGELOG.md) as working memory for this project.**
 
 ### At Session Start
-- **Read `.github/PROJECT_STATE.md`** to understand current state, recent changes, and pending work
+- **Read CHANGELOG.md's "Project history" section** to understand current state, recent changes, and pending work
 - Review any in-progress items or architectural decisions
 
 ### During Work
-Update PROJECT_STATE.md whenever:
+Update CHANGELOG.md's "Project history" section whenever:
 - Implementing new features or systems
 - Making architectural decisions or changes
 - Discovering technical debt or issues
@@ -105,4 +107,3 @@ Update PROJECT_STATE.md whenever:
 - Keep entries **concise but specific** (reference file paths, function names)
 - **Date entries** in Recent Changes section
 - Remove outdated items from "Next Steps" as they're completed
-- If PROJECT_STATE.md doesn't exist, **create it** with current project state
