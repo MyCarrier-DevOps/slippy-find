@@ -32,8 +32,9 @@ replaced row, and re-running the action resolves the new slip.
 
 Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
 offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claim);
-autotrigger-automation-tests (protected by MC.TestEngine's own claim); request-pr-checks, retrigger-ci,
-purge-offload and grafana-pr-comment-link (no slip writes against the resolved ID).
+autotrigger-automation-tests (protected by MC.TestEngine's claim once DEVOPS-364 is rolled out);
+request-pr-checks, retrigger-ci, purge-offload and grafana-pr-comment-link (no slip writes against the
+resolved ID).
 
 ## Installation
 
