@@ -13,6 +13,25 @@ A Go CLI application that resolves routing slips from local Git repository commi
 - **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 30s timeout)
 - **Clean architecture** — full dependency injection for testability
 
+### Read-only by design
+
+slippy-find only reads. Its store adapter implements `FindByCommits` and `Close` and nothing else
+(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read-scoped key and must never be
+given the write key or a write path. It never claims, starts, completes or abandons a slip.
+
+Every consumer of its output is therefore an **adopter**: it holds the correlation ID of a slip it did
+not create (slips are created only by pushhookparser) and must not assume the slip is protected.
+Protection comes from the claim the downstream Argo workflow takes in its first `slippy-pre-job` step
+(the Slippy CLI claims before any work runs), or, for a flow that bypasses Argo, from the adopter's own
+claim. Between slippy-find's lookup and that claim a same-commit push can replace an ended, unclaimed
+slip; the downstream pre-job then fails its lookup by correlation ID loudly instead of writing to a
+replaced row, and re-running the action resolves the new slip.
+
+Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
+offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claim);
+autotrigger-automation-tests (protected by MC.TestEngine's own claim); request-pr-checks, retrigger-ci,
+purge-offload and grafana-pr-comment-link (no slip writes against the resolved ID).
+
 ## Installation
 
 ### Using `go install`
