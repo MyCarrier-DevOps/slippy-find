@@ -16,11 +16,14 @@ A Go CLI application that resolves routing slips from local Git repository commi
 ### Read-only by design
 
 slippy-find only reads. Its store adapter implements `FindByCommits` and `Close` and nothing else
-(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read-scoped key and must never be
-given the write key or a write path. It never claims, starts, completes or abandons a slip.
+(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read-scoped key. slippy-api also
+accepts the write key on that lookup route, so keeping the write key and any write path away from
+slippy-find is a deployment rule, not something the API enforces. It never claims, starts, completes
+or abandons a slip.
 
 Every consumer of its output is therefore an **adopter**: it holds the correlation ID of a slip it did
-not create (slips are created only by pushhookparser) and must not assume the slip is protected.
+not create (slips are created by pushhookparser, and for the weekly base-image builds by
+baseimagebuilder; never by slippy-find) and must not assume the slip is protected.
 Protection comes from the claim the downstream Argo workflow takes in its first `slippy-pre-job` step
 (the Slippy CLI claims before any work runs), or, for a flow that bypasses Argo, from the adopter's own
 claim. Between slippy-find's lookup and that claim a same-commit push can replace an ended, unclaimed
