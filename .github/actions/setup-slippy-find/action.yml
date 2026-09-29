@@ -6,7 +6,7 @@ branding:
 
 inputs:
   version:
-    description: 'Version to install (e.g., v0.2.0). Use "latest" for the most recent release.'
+    description: 'Release tag to install, in the form vX.Y.Z (e.g., v0.8.2). Use "latest" for the most recent release.'
     required: false
     default: 'latest'
 
@@ -40,15 +40,30 @@ runs:
 
     - name: Download slippy-find
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        BINARY: ${{ steps.platform.outputs.binary }}
       run: |
-        VERSION="${{ inputs.version }}"
-        BINARY="${{ steps.platform.outputs.binary }}"
+        # The inputs arrive through env:, never substituted into this script. Allow-list the
+        # version, so it can name only a release tag of this repository.
+        if [ "$VERSION" != "latest" ] && ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Invalid version '${VERSION}': use \"latest\" or a release tag such as v0.8.2"
+          exit 1
+        fi
         
         if [ "$VERSION" = "latest" ]; then
-          BASE_URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/latest/download"
-        else
-          BASE_URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}"
+          # Resolve "latest" to one tag, so the binary and checksums.txt come from the same release.
+          LATEST_URL=$(curl -s --fail -o /dev/null -w '%{redirect_url}' \
+            "https://github.com/MyCarrier-DevOps/slippy-find/releases/latest") || {
+            echo "::error::Failed to resolve the latest slippy-find release"
+            exit 1
+          }
+          case "$LATEST_URL" in
+            https://github.com/MyCarrier-DevOps/slippy-find/releases/tag/?*) VERSION="${LATEST_URL##*/}" ;;
+            *) echo "::error::Could not resolve the latest slippy-find release (got '${LATEST_URL}')"; exit 1 ;;
+          esac
         fi
+        BASE_URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}"
         URL="${BASE_URL}/${BINARY}"
         SUMS_URL="${BASE_URL}/checksums.txt"
         

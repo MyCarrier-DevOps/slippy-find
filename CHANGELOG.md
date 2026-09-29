@@ -11,6 +11,10 @@
 - `setup-slippy-find` verifies the downloaded binary against the release's `checksums.txt`. It
   fails the step and removes the download when that file cannot be fetched, has no single
   well-formed entry for the binary, or does not match it (DEVOPS-364).
+- `setup-slippy-find` passes its inputs through `env:` rather than into the script, and accepts
+  only `latest` or a `vX.Y.Z` tag as `version`, failing the step before any download otherwise.
+  It resolves `latest` to one tag, so the binary and `checksums.txt` come from the same release
+  (DEVOPS-364).
 
 ## [v0.8.2] - 2026-09-02
 
