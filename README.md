@@ -76,11 +76,12 @@ go install github.com/MyCarrier-DevOps/slippy-find@latest
 
 ### GitHub Actions
 
-Use the provided action to install pre-built binaries (fastest):
+Use the provided action to install pre-built binaries (fastest). Pin it to a release's commit SHA
+(as below) or its tag, not to `@main`, which changes with every merge:
 
 ```yaml
 - name: Install slippy-find
-  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
+  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@5f15b84f7c4c975313ad655cd995a9aa2afd6d89 # v0.8.2
 
 - name: Run slippy-find
   env:
@@ -89,12 +90,13 @@ Use the provided action to install pre-built binaries (fastest):
   run: slippy-find
 ```
 
-To pin to a specific version:
+The action installs the latest release's binary unless `version` names one. To pin the binary
+too, set it to the same release:
 
 ```yaml
-- uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
+- uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@5f15b84f7c4c975313ad655cd995a9aa2afd6d89 # v0.8.2
   with:
-    version: v0.2.0
+    version: v0.8.2
 ```
 
 ### Download Binary
