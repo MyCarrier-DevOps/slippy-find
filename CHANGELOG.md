@@ -6,6 +6,8 @@
 
 - README: documented slippy-find as read-only by design, with its consumers as adopters (DEVOPS-364).
 
+## [v0.8.2] - 2026-09-02
+
 ### go-devkit onboarding
 
 - Onboarded the repo into the **go-devkit** apm plugin workflow (`apm.yml`,
