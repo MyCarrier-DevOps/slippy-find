@@ -16,7 +16,8 @@ A Go CLI application that resolves routing slips from local Git repository commi
 ### Read-only by design
 
 slippy-find only reads. Its store adapter implements `FindByCommits` and `Close` and nothing else
-(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read-scoped key. slippy-api also
+(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read key: the value slippy-api
+itself loads as `SLIPPY_API_KEY`, never the one it loads as `SLIPPY_WRITE_API_KEY`. slippy-api also
 accepts the write key on that lookup route, so keeping the write key and any write path away from
 slippy-find is a deployment rule, not something the API enforces. It never claims, starts, completes
 or abandons a slip.
