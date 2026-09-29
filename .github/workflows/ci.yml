@@ -123,10 +123,14 @@ jobs:
       - name: Create release notes
         id: changelog
         if: steps.tag_version.outputs.new_tag
+        env:
+          CHANGELOG: ${{ steps.tag_version.outputs.changelog }}
         run: |
-          echo "## What's Changed" > release_notes.md
-          echo "" >> release_notes.md
-          echo "${{ steps.tag_version.outputs.changelog }}" >> release_notes.md
+          {
+            echo "## What's Changed"
+            echo ""
+            printf '%s\n' "$CHANGELOG"
+          } > release_notes.md
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.tag_version.outputs.new_tag
@@ -135,8 +139,9 @@ jobs:
 
       - name: Build binaries
         if: steps.tag_version.outputs.new_tag
+        env:
+          VERSION: ${{ steps.tag_version.outputs.new_tag }}
         run: |
-          VERSION=${{ steps.tag_version.outputs.new_tag }}
           LDFLAGS="-s -w -X github.com/MyCarrier-DevOps/slippy-find/cmd.Version=${VERSION}"
 
           # Build for multiple platforms
@@ -168,9 +173,11 @@ jobs:
 
       - name: Update Go module proxy
         if: steps.tag_version.outputs.new_tag
+        env:
+          VERSION: ${{ steps.tag_version.outputs.new_tag }}
         run: |
           # Request the new version from proxy.golang.org to trigger caching
-          curl -s "https://proxy.golang.org/github.com/!my!carrier-!dev!ops/slippy-find/@v/${{ steps.tag_version.outputs.new_tag }}.info" || true
+          curl -s "https://proxy.golang.org/github.com/!my!carrier-!dev!ops/slippy-find/@v/${VERSION}.info" || true
           # Also request the version list to update it
           curl -s "https://proxy.golang.org/github.com/!my!carrier-!dev!ops/slippy-find/@v/list" || true
-          echo "Module proxy updated for ${{ steps.tag_version.outputs.new_tag }}"
+          echo "Module proxy updated for ${VERSION}"
