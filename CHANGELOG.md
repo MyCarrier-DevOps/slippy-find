@@ -6,6 +6,12 @@
 
 - README: documented slippy-find as read-only by design, with its consumers as adopters (DEVOPS-364).
 
+### Security
+
+- `setup-slippy-find` verifies the downloaded binary against the release's `checksums.txt`. It
+  fails the step and removes the download when that file cannot be fetched, has no single
+  well-formed entry for the binary, or does not match it (DEVOPS-364).
+
 ## [v0.8.2] - 2026-09-02
 
 ### go-devkit onboarding
