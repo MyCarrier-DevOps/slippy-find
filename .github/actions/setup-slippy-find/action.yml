@@ -6,7 +6,7 @@ branding:
 
 inputs:
   version:
-    description: 'Version to install (e.g., v0.2.0). Use "latest" for the most recent release.'
+    description: 'Release tag to install, in the form vX.Y.Z (e.g., v0.8.2). Use "latest" for the most recent release.'
     required: false
     default: 'latest'
 
@@ -40,14 +40,40 @@ runs:
 
     - name: Download slippy-find
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        BINARY: ${{ steps.platform.outputs.binary }}
       run: |
-        VERSION="${{ inputs.version }}"
-        BINARY="${{ steps.platform.outputs.binary }}"
+        # The inputs arrive through env:, never substituted into this script. Allow-list the
+        # version, so it can name only a release tag of this repository.
+        if [ "$VERSION" != "latest" ] && ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Invalid version '${VERSION}': use \"latest\" or a release tag such as v0.8.2"
+          exit 1
+        fi
         
+        LATEST_URL=""
         if [ "$VERSION" = "latest" ]; then
-          URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/latest/download/${BINARY}"
-        else
-          URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}/${BINARY}"
+          # Resolve "latest" to one tag, so the binary and checksums.txt come from the same release.
+          LATEST_URL=$(curl -s --fail -o /dev/null -w '%{redirect_url}' \
+            "https://github.com/MyCarrier-DevOps/slippy-find/releases/latest") || {
+            echo "::error::Failed to resolve the latest slippy-find release"
+            exit 1
+          }
+          case "$LATEST_URL" in
+            https://github.com/MyCarrier-DevOps/slippy-find/releases/tag/?*) VERSION="${LATEST_URL##*/}" ;;
+            *) echo "::error::Could not resolve the latest slippy-find release (got '${LATEST_URL}')"; exit 1 ;;
+          esac
+        fi
+        BASE_URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}"
+        URL="${BASE_URL}/${BINARY}"
+        SUMS_URL="${BASE_URL}/checksums.txt"
+        
+        # The resolved tag passes the same allow-list, as the redirect's whole tail: .../tag/nightly,
+        # .../tag/.. and a nested .../tag/a/b/v9.9.9 are refused, not cut down to their last segment.
+        if [ -n "$LATEST_URL" ] &&
+          ! [[ "${LATEST_URL#https://github.com/MyCarrier-DevOps/slippy-find/releases/tag/}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::The latest slippy-find release resolved to an unexpected tag (got '${LATEST_URL}')"
+          exit 1
         fi
         
         echo "Downloading slippy-find from: $URL"
@@ -56,12 +82,40 @@ runs:
           exit 1
         }
         
+        # Verify the binary against the checksums.txt the release job publishes beside it.
+        # Fail closed: a missing checksums.txt, no single well-formed entry for this binary,
+        # or a mismatch removes the download and fails the step. The hash is validated here
+        # because macOS's sha256sum -c only warns, and exits 0, on a malformed line.
+        SUMS=$(curl -sL --fail "$SUMS_URL") || {
+          rm -f slippy-find
+          echo "::error::Failed to download checksums from $SUMS_URL"
+          exit 1
+        }
+        EXPECTED=$(printf '%s\n' "$SUMS" | awk -v f="$BINARY" '$2 == f { n++; h = $1 } END { if (n == 1) print h }')
+        if ! [[ "$EXPECTED" =~ ^[0-9a-f]{64}$ ]]; then
+          rm -f slippy-find
+          echo "::error::$SUMS_URL has no single well-formed SHA-256 entry for $BINARY"
+          exit 1
+        fi
+        if command -v sha256sum >/dev/null 2>&1; then
+          SHA256_CHECK=(sha256sum -c -)
+        else
+          SHA256_CHECK=(shasum -a 256 -c -)
+        fi
+        if ! printf '%s  %s\n' "$EXPECTED" slippy-find | "${SHA256_CHECK[@]}"; then
+          rm -f slippy-find
+          echo "::error::slippy-find does not match the SHA-256 of $BINARY in $SUMS_URL"
+          exit 1
+        fi
+        
         chmod +x slippy-find
 
     - name: Install slippy-find
       shell: bash
+      env:
+        PLATFORM_OS: ${{ steps.platform.outputs.os }}
       run: |
-        if [ "${{ steps.platform.outputs.os }}" = "windows" ]; then
+        if [ "$PLATFORM_OS" = "windows" ]; then
           mkdir -p "$HOME/bin"
           mv slippy-find "$HOME/bin/slippy-find.exe"
           echo "$HOME/bin" >> "$GITHUB_PATH"

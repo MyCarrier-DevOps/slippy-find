@@ -10,8 +10,62 @@ A Go CLI application that resolves routing slips from local Git repository commi
 
 - **Local Git operations only** — no GitHub API calls; works entirely with local repositories
 - **Commit ancestry walking** — uses `go-git/v5` to traverse commit history from HEAD
-- **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 30s timeout)
+- **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 45s per attempt under a 50s retry budget)
 - **Clean architecture** — full dependency injection for testability
+
+### Read-only by design
+
+slippy-find only reads. Its store adapter implements `FindByCommits` and `Close` and nothing else
+(`internal/adapters/store/slipapi.go`); it needs only slippy-api's read key: the value slippy-api
+itself loads as `SLIPPY_API_KEY`, never the one it loads as `SLIPPY_WRITE_API_KEY`. slippy-api also
+accepts the write key on that lookup route, so keeping the write key and any write path away from
+slippy-find is a deployment rule, not something the API enforces. It never claims, starts, completes
+or abandons a slip.
+
+Every consumer of its output is therefore an **adopter**: it holds the correlation ID of a slip it did
+not create (slips are created by pushhookparser, and for the weekly base-image builds by
+baseimagebuilder; never by slippy-find) and must not assume the slip is protected.
+Protection comes from a claim taken before the work runs. In the slip-routed Argo templates, the
+Slippy CLI takes it in every `slippy-pre-job` step, after that step's StartStep and before its work,
+and every `slippy-post-job` releases it if nothing on the slip is still running or held. A template
+with several slip-routed steps is therefore unclaimed between one step's post-job and the next
+step's claim (DEVOPS-371): creategithubrelease (create-production-release) is unclaimed after
+prod-gate's post-job until `slip-pre` claims, and again after its inline `slip-post`, once the
+GitHub release is created, until release-deploy's `slip-pre-deploy` claims. The claim is
+best-effort: if slippy-api refuses it or does not confirm it, the pre-job logs a warning
+("slippy-api refused the claim; not claimed" or
+"Claim of adopted slip not confirmed; proceeding"), and it skips the claim for a slip whose status
+is missing (silently) or unrecognised ("Unrecognised slip status; claim protection not applied");
+either way the work runs without a confirmed claim. A downstream workflow
+with no `slippy-pre-job` step takes no claim even when it runs on Argo (autotriggertests hands the
+ID to MC.TestEngine). There, and in any flow that bypasses Argo, the component that writes against
+the ID must claim it before dispatching work, dispatch nothing if slippy-api refuses the claim,
+including the 404 it returns for a slip already replaced, and release it
+(`POST /v1/slips/{id}/release`) once its last slip write has returned, whether or not it succeeded,
+never before, or at once if it dispatches nothing: a `failed` status does not end a claim, and while
+one is held every same-commit push is deduplicated and gets no CI. slippy-api's contract asks for
+nothing to be dispatched on any claim it did not confirm; MC.TestEngine's DEVOPS-364 claim, once
+rolled out, deliberately dispatches when the claim is unconfirmed but not refused, and logs an
+Error. Claiming and releasing are write-tier calls, so that is the in-cluster writer; a GitHub
+Actions adopter should hold only the read key.
+
+Between slippy-find's lookup and the first pre-job's StartStep, a same-commit push can replace an
+ended, unclaimed slip; that pre-job then fails on the old correlation ID before any work runs, and
+re-running the action resolves the new slip. A replacement between two steps fails the next
+pre-job the same way, but after the earlier steps' work: for create-production-release, a
+replacement after the inline `slip-post` leaves the GitHub release created and prod_deploy not
+run, and re-running the action starts over from prod-gate against the new slip. A replacement
+after a step's StartStep and before its claim lands, or while its claim is unconfirmed, is not
+caught by that pre-job: that step's work runs and its post-job's write 404s. For offload and
+non-prod-deploy (render-offload, render-manual) that failure shows only on the exit hook's
+`slip-post` step, not on the workflow, and re-running the action repeats the work.
+
+Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
+offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claims,
+within the limits above, including create-production-release's two unclaimed gaps between steps);
+autotrigger-automation-tests (protected by MC.TestEngine's claim once DEVOPS-364 is rolled out);
+request-pr-checks, retrigger-ci, purge-offload and grafana-pr-comment-link (no slip writes against the
+resolved ID).
 
 ## Installation
 
@@ -23,25 +77,22 @@ go install github.com/MyCarrier-DevOps/slippy-find@latest
 
 ### GitHub Actions
 
-Use the provided action to install pre-built binaries (fastest):
+Use the provided action to install pre-built binaries (fastest). Pin the action to a release's full
+commit SHA, not to a tag or `@main`: a tag can be moved to other code after you pin it, and `@main`
+changes with every merge. Set `version` to the same release too; without it the action installs the
+latest release's binary, and every merge to `main` publishes a new one:
 
 ```yaml
 - name: Install slippy-find
-  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
+  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@5f15b84f7c4c975313ad655cd995a9aa2afd6d89 # v0.8.2
+  with:
+    version: v0.8.2
 
 - name: Run slippy-find
   env:
     SLIPPY_API_URL: ${{ vars.SLIPPY_API_URL }}
     SLIPPY_API_KEY: ${{ secrets.SLIPPY_API_KEY }}
   run: slippy-find
-```
-
-To pin to a specific version:
-
-```yaml
-- uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@main
-  with:
-    version: v0.2.0
 ```
 
 ### Download Binary
