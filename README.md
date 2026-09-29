@@ -10,7 +10,7 @@ A Go CLI application that resolves routing slips from local Git repository commi
 
 - **Local Git operations only** — no GitHub API calls; works entirely with local repositories
 - **Commit ancestry walking** — uses `go-git/v5` to traverse commit history from HEAD
-- **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 30s timeout)
+- **slippy-api HTTP client** — looks up slips via `POST /slips/find-by-commits` using the [`slippy-api/slippy-client`](https://github.com/MyCarrier-DevOps/slippy-api) generated client (bearer-token auth, 45s per attempt under a 50s retry budget)
 - **Clean architecture** — full dependency injection for testability
 
 ### Read-only by design
