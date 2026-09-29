@@ -84,9 +84,9 @@ latest release's binary, and every merge to `main` publishes a new one:
 
 ```yaml
 - name: Install slippy-find
-  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@5f15b84f7c4c975313ad655cd995a9aa2afd6d89 # v0.8.2
+  uses: MyCarrier-DevOps/slippy-find/.github/actions/setup-slippy-find@6135c60f515071ab8a708c3d888d397170325959 # v0.8.3
   with:
-    version: v0.8.2
+    version: v0.8.3
 
 - name: Run slippy-find
   env:
