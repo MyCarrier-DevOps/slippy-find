@@ -27,13 +27,14 @@ baseimagebuilder; never by slippy-find) and must not assume the slip is protecte
 Protection comes from a claim taken before the work runs. In the slip-routed Argo templates, the
 Slippy CLI takes it in the first `slippy-pre-job` step, after that step's StartStep and before the
 main work. The claim is best-effort: if slippy-api refuses it or does not confirm it, the pre-job
-logs a warning ("Claim of adopted slip not confirmed; proceeding" or
-"slippy-api refused the claim; not claimed"), and it skips the claim for a slip whose status is
-missing or unrecognised; either way the work runs without a confirmed claim. A downstream workflow
+logs a warning ("slippy-api refused the claim; not claimed" or
+"Claim of adopted slip not confirmed; proceeding"), and it skips the claim for a slip whose status
+is missing (silently) or unrecognised ("Unrecognised slip status; claim protection not applied");
+either way the work runs without a confirmed claim. A downstream workflow
 with no `slippy-pre-job` step takes no claim even when it runs on Argo (autotriggertests hands the
 ID to MC.TestEngine). There, and in any flow that bypasses Argo, the component that writes against
 the ID must claim it before dispatching work. Claiming is a write-tier call, so that is the
-in-cluster writer; a GitHub Actions adopter holds only the read key.
+in-cluster writer; a GitHub Actions adopter should hold only the read key.
 
 Between slippy-find's lookup and the pre-job's StartStep, a same-commit push can replace an ended,
 unclaimed slip; the pre-job then fails on the old correlation ID before any work runs, and
