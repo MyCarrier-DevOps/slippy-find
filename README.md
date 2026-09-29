@@ -40,13 +40,13 @@ with no `slippy-pre-job` step takes no claim even when it runs on Argo (autotrig
 ID to MC.TestEngine). There, and in any flow that bypasses Argo, the component that writes against
 the ID must claim it before dispatching work, dispatch nothing if slippy-api refuses the claim,
 including the 404 it returns for a slip already replaced, and release it
-(`POST /v1/slips/{id}/release`) once its last slip write has returned, whether or not it
-succeeded, never before, or at once if it dispatches nothing: a `failed` status does not end a claim, and while one is held every same-commit
-push is deduplicated and gets no CI. slippy-api's contract asks for nothing to be dispatched on any
-claim it did not confirm; MC.TestEngine's DEVOPS-364 claim, once rolled out, deliberately dispatches
-when the claim is unconfirmed but not refused, and logs an Error. Claiming and releasing are
-write-tier calls, so that is the in-cluster writer; a GitHub Actions adopter should hold only the
-read key.
+(`POST /v1/slips/{id}/release`) once its last slip write has returned, whether or not it succeeded,
+never before, or at once if it dispatches nothing: a `failed` status does not end a claim, and while
+one is held every same-commit push is deduplicated and gets no CI. slippy-api's contract asks for
+nothing to be dispatched on any claim it did not confirm; MC.TestEngine's DEVOPS-364 claim, once
+rolled out, deliberately dispatches when the claim is unconfirmed but not refused, and logs an
+Error. Claiming and releasing are write-tier calls, so that is the in-cluster writer; a GitHub
+Actions adopter should hold only the read key.
 
 Between slippy-find's lookup and the first pre-job's StartStep, a same-commit push can replace an
 ended, unclaimed slip; that pre-job then fails on the old correlation ID before any work runs, and
@@ -60,7 +60,8 @@ non-prod-deploy (render-offload, render-manual) that failure shows only on the e
 `slip-post` step, not on the workflow, and re-running the action repeats the work.
 
 Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
-offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claim);
+offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claims,
+within the limits above, including create-production-release's two unclaimed gaps between steps);
 autotrigger-automation-tests (protected by MC.TestEngine's claim once DEVOPS-364 is rolled out);
 request-pr-checks, retrigger-ci, purge-offload and grafana-pr-comment-link (no slip writes against the
 resolved ID).
