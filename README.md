@@ -24,11 +24,23 @@ or abandons a slip.
 Every consumer of its output is therefore an **adopter**: it holds the correlation ID of a slip it did
 not create (slips are created by pushhookparser, and for the weekly base-image builds by
 baseimagebuilder; never by slippy-find) and must not assume the slip is protected.
-Protection comes from the claim the downstream Argo workflow takes in its first `slippy-pre-job` step
-(the Slippy CLI claims before any work runs), or, for a flow that bypasses Argo, from the adopter's own
-claim. Between slippy-find's lookup and that claim a same-commit push can replace an ended, unclaimed
-slip; the downstream pre-job then fails its lookup by correlation ID loudly instead of writing to a
-replaced row, and re-running the action resolves the new slip.
+Protection comes from a claim taken before the work runs. In the slip-routed Argo templates, the
+Slippy CLI takes it in the first `slippy-pre-job` step, after that step's StartStep and before the
+main work. The claim is best-effort: if slippy-api refuses it or does not confirm it, the pre-job
+logs a warning ("Claim of adopted slip not confirmed; proceeding" or
+"slippy-api refused the claim; not claimed"), and it skips the claim for a slip whose status is
+missing or unrecognised; either way the work runs without a confirmed claim. A downstream workflow
+with no `slippy-pre-job` step takes no claim even when it runs on Argo (autotriggertests hands the
+ID to MC.TestEngine). There, and in any flow that bypasses Argo, the component that writes against
+the ID must claim it before dispatching work. Claiming is a write-tier call, so that is the
+in-cluster writer; a GitHub Actions adopter holds only the read key.
+
+Between slippy-find's lookup and the pre-job's StartStep, a same-commit push can replace an ended,
+unclaimed slip; the pre-job then fails on the old correlation ID before any work runs, and
+re-running the action resolves the new slip. A replacement after StartStep, or while the claim is
+unconfirmed, is not caught by the pre-job: the work runs and the post-job's write 404s. For offload
+and non-prod-deploy (render-offload, render-manual) that failure shows only on the exit hook's
+`slip-post` step, not on the workflow, and re-running the action repeats the work.
 
 Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
 offload, create-npm-packages and create-nuget-packages (protected by the downstream pre-job claim);
