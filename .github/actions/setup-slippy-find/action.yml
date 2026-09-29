@@ -51,6 +51,7 @@ runs:
           exit 1
         fi
         
+        LATEST_URL=""
         if [ "$VERSION" = "latest" ]; then
           # Resolve "latest" to one tag, so the binary and checksums.txt come from the same release.
           LATEST_URL=$(curl -s --fail -o /dev/null -w '%{redirect_url}' \
@@ -66,6 +67,14 @@ runs:
         BASE_URL="https://github.com/MyCarrier-DevOps/slippy-find/releases/download/${VERSION}"
         URL="${BASE_URL}/${BINARY}"
         SUMS_URL="${BASE_URL}/checksums.txt"
+        
+        # The resolved tag passes the same allow-list, as the redirect's whole tail: .../tag/nightly,
+        # .../tag/.. and a nested .../tag/a/b/v9.9.9 are refused, not cut down to their last segment.
+        if [ -n "$LATEST_URL" ] &&
+          ! [[ "${LATEST_URL#https://github.com/MyCarrier-DevOps/slippy-find/releases/tag/}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::The latest slippy-find release resolved to an unexpected tag (got '${LATEST_URL}')"
+          exit 1
+        fi
         
         echo "Downloading slippy-find from: $URL"
         curl -sL --fail "$URL" -o slippy-find || {
@@ -103,8 +112,10 @@ runs:
 
     - name: Install slippy-find
       shell: bash
+      env:
+        PLATFORM_OS: ${{ steps.platform.outputs.os }}
       run: |
-        if [ "${{ steps.platform.outputs.os }}" = "windows" ]; then
+        if [ "$PLATFORM_OS" = "windows" ]; then
           mkdir -p "$HOME/bin"
           mv slippy-find "$HOME/bin/slippy-find.exe"
           echo "$HOME/bin" >> "$GITHUB_PATH"
