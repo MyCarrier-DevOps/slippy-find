@@ -25,22 +25,38 @@ Every consumer of its output is therefore an **adopter**: it holds the correlati
 not create (slips are created by pushhookparser, and for the weekly base-image builds by
 baseimagebuilder; never by slippy-find) and must not assume the slip is protected.
 Protection comes from a claim taken before the work runs. In the slip-routed Argo templates, the
-Slippy CLI takes it in the first `slippy-pre-job` step, after that step's StartStep and before the
-main work. The claim is best-effort: if slippy-api refuses it or does not confirm it, the pre-job
-logs a warning ("slippy-api refused the claim; not claimed" or
+Slippy CLI takes it in every `slippy-pre-job` step, after that step's StartStep and before its work,
+and every `slippy-post-job` releases it if nothing on the slip is still running or held. A template
+with several slip-routed steps is therefore unclaimed between one step's post-job and the next
+step's claim (DEVOPS-371): creategithubrelease (create-production-release) is unclaimed after
+prod-gate's post-job until `slip-pre` claims, and again after its inline `slip-post`, once the
+GitHub release is created, until release-deploy's `slip-pre-deploy` claims. The claim is
+best-effort: if slippy-api refuses it or does not confirm it, the pre-job logs a warning
+("slippy-api refused the claim; not claimed" or
 "Claim of adopted slip not confirmed; proceeding"), and it skips the claim for a slip whose status
 is missing (silently) or unrecognised ("Unrecognised slip status; claim protection not applied");
 either way the work runs without a confirmed claim. A downstream workflow
 with no `slippy-pre-job` step takes no claim even when it runs on Argo (autotriggertests hands the
 ID to MC.TestEngine). There, and in any flow that bypasses Argo, the component that writes against
-the ID must claim it before dispatching work. Claiming is a write-tier call, so that is the
-in-cluster writer; a GitHub Actions adopter should hold only the read key.
+the ID must claim it before dispatching work, dispatch nothing if slippy-api refuses the claim,
+including the 404 it returns for a slip already replaced, and release it
+(`POST /v1/slips/{id}/release`) once its last slip write has returned, whether or not it
+succeeded, never before, or at once if it dispatches nothing: a `failed` status does not end a claim, and while one is held every same-commit
+push is deduplicated and gets no CI. slippy-api's contract asks for nothing to be dispatched on any
+claim it did not confirm; MC.TestEngine's DEVOPS-364 claim, once rolled out, deliberately dispatches
+when the claim is unconfirmed but not refused, and logs an Error. Claiming and releasing are
+write-tier calls, so that is the in-cluster writer; a GitHub Actions adopter should hold only the
+read key.
 
-Between slippy-find's lookup and the pre-job's StartStep, a same-commit push can replace an ended,
-unclaimed slip; the pre-job then fails on the old correlation ID before any work runs, and
-re-running the action resolves the new slip. A replacement after StartStep, or while the claim is
-unconfirmed, is not caught by the pre-job: the work runs and the post-job's write 404s. For offload
-and non-prod-deploy (render-offload, render-manual) that failure shows only on the exit hook's
+Between slippy-find's lookup and the first pre-job's StartStep, a same-commit push can replace an
+ended, unclaimed slip; that pre-job then fails on the old correlation ID before any work runs, and
+re-running the action resolves the new slip. A replacement between two steps fails the next
+pre-job the same way, but after the earlier steps' work: for create-production-release, a
+replacement after the inline `slip-post` leaves the GitHub release created and prod_deploy not
+run, and re-running the action starts over from prod-gate against the new slip. A replacement
+after a step's StartStep and before its claim lands, or while its claim is unconfirmed, is not
+caught by that pre-job: that step's work runs and its post-job's write 404s. For offload and
+non-prod-deploy (render-offload, render-manual) that failure shows only on the exit hook's
 `slip-post` step, not on the workflow, and re-running the action repeats the work.
 
 Consumers in `MyCarrier-Engineering/admin` as of 2026-09-24: create-production-release, non-prod-deploy,
